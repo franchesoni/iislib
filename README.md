@@ -8,9 +8,9 @@ In an IIS system we have many components, organized as the folders of the projec
 
 ## Structure
 - `data/`
-    - `iis_dataset.py`: given a dataset script, which retrieves a sample image and its masks, we must select one ground truth mask from between these masks. Different strategies are implemented here.
+    - `iis_dataset.py`: Abstract `SegDataset` (to load whatever segmentation dataset you have) and `RegionDataset` classes are here defined. Use them to retrieve image and masks or image and target region, respectively.
     - `datasets/`
-        - `dataset_name.py`: each dataset is usually an image segmentation dataset and has an specific script to load each image and its corresponding masks.
+        - `dataset_name.py`: each specific dataset is usually an image segmentation dataset and has an specific script to load each image and its corresponding masks. Subclass `SegDataset`
     - `region_selector.py`: given a dataset script, which retrieves a sample image and its masks, we must select one ground truth mask from between these masks. Different strategies are implemented here.
     - `clicking.py`: given a ground truth mask, past clicks and a prediction, we compute the next click according to different strategies. The prediction can be empty if it is the first step. This script also implements clicks encoding.
 - `models/`: for us, IIS models are segmentation models with more input channels
@@ -33,14 +33,15 @@ I will (try to) use a functional programming approach. This is, most things will
 ## Decisions
 The organization gives room for many decisions to be made. For instance: 
 - which dataset to use? e.g. new dataset vs recommended COCO_LVIS
-- how to sample ground truth regions from the dataset?
-- how to sample clicks? (initial and subsequent) e.g. randomly, over error regions
-- how to encode clicks?
-- how to wrap a segmentation model?
-- how to wrap a feature extractor?
-- which metrics to compute?
+- how to sample ground truth regions from the dataset? e.g. randomly, ignoring background, merging
+- how to sample clicks? (initial and subsequent) e.g. randomly, over error regions, over borders, depending on distance to the border
+- how to encode clicks? e.g. disks, distance maps
+- how to wrap a segmentation model? e.g. early vs late fusion
+- how to wrap a feature extractor? e.g. which upsampler to use
+- which metrics to compute? e.g. mIoU vs n_clicks
 - how to do the training? e.g. iterative
 
 ## Future optimizations
 
 - use fast jpeg reader instead of opencv
+- profile and reduce training time of full example
