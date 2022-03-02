@@ -200,17 +200,17 @@ def test():
     def get_positive_clicks(n, mask, near_border, uniform_probs, erode_iters):
         return [
             get_positive_click(
-                masks[0], near_border=True, uniform_probs=True, erode_iters=5
+                mask, near_border=near_border, uniform_probs=uniform_probs, erode_iters=erode_iters
             )
-            for _ in range(10)
+            for _ in range(n)
         ]
 
     def get_negative_clicks(n, mask, near_border, uniform_probs, dilate_iters):
         ncs = [
             get_negative_click(
-                masks[0], near_border=True, uniform_probs=True, dilate_iters=15
+                mask, near_border=near_border, uniform_probs=uniform_probs, dilate_iters=dilate_iters
             )
-            for _ in range(10)
+            for _ in range(n)
         ]
         return list(filter(lambda x: x is not None, ncs))  # remove None elements
 
