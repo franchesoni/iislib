@@ -84,23 +84,3 @@ if __name__ == "__main__":
             plt.savefig(f"layer_{idx}.png")
         print(info)
         breakpoint()
-
-
-# removed
-
-# # probability of not erasing the last masks which are not counted as instances (background stuff)
-# self.stuff_prob = stuff_prob
-# # if not erasing, these things are set to not have parents
-
-
-# if self.stuff_prob > 0 and random.random() < self.stuff_prob:
-#     for inst_id in range(sample['num_instance_masks'], len(objs_mapping)):
-#         instances_info[inst_id] = {
-#             'mapping': objs_mapping[inst_id],
-#             'parent': None,
-#             'children': []
-#         }
-# else:
-#     for inst_id in range(sample['num_instance_masks'], len(objs_mapping)):
-#         layer_indx, mask_id = objs_mapping[inst_id]
-#         layers[:, :, layer_indx][layers[:, :, layer_indx] == mask_id] = 0

@@ -1,6 +1,7 @@
 from copy import deepcopy 
 from torchvision.transforms import CenterCrop
 import albumentations as A
+# (iis) franchesoni@weird-power:~/iis/iis_framework$ numpy cv2 matplotlib torch albumentations torchvision
 
 class RandomCrop:
     def __init__(self, out_size=None):

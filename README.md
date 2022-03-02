@@ -6,6 +6,10 @@ This is a library that exposes simple but powerful modules to do research on Int
 
 In an IIS system we have many components, organized as the folders of the project or implementing one of the decisions below.
 
+## Run
+Each script has a `test` function which is usually called when running the script directly. For instance, you can run `python -m data.clicking` and see what happens :)
+
+
 ## Structure
 - `data/`
     - `iis_dataset.py`: Abstract `SegDataset` (to load whatever segmentation dataset you have) and `RegionDataset` classes are here defined. Use them to retrieve image and masks or image and target region, respectively.
