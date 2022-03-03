@@ -1,4 +1,5 @@
 import functools
+import skimage
 
 import numpy as np
 import torch
@@ -44,6 +45,30 @@ def check_inclusion(mask1, mask2):
         parent = None
         child = None
     return included, parent, child
+
+
+def is_connected(mask):
+    return skimage.morphology.label(mask).max() == 1  # only one class
+
+def compute_area(mask):
+    assert mask.min() == 0 and mask.max() == 1
+    return np.sum(mask == 1)
+
+def get_subregions_as_layers(mask):
+    labeled_regions = skimage.morphology.label(mask)
+    n_regions = labeled_regions.max()
+    layers = [np.zeros_like(mask)] * n_regions
+    for l_ind, label in enumerate(range(1, n_regions + 1)):
+        layers[l_ind][labeled_regions==label] = 1
+    return np.stack(layers)
+
+def get_biggest_region(mask):
+    labeled_regions = skimage.morphology.label(mask)
+    areas = np.bincount(labeled_regions)
+    return np.amax(areas[1:])
+
+
+
 
 
 ## region selectors ##
