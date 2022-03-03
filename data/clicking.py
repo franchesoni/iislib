@@ -1,22 +1,39 @@
 import torch
 import numpy as np
+import copy
 import cv2
 
-
-def is_connected(mask):
-    raise NotImplementedError
-
-
-def compute_area(mask):
-    raise NotImplementedError
-
-
-def get_subregions_as_layers(mask):
-    raise NotImplementedError
+def simplest_disk(radius):
+    out_side = radius*2 + 1
+    out = np.zeros((out_side, out_side))
+    rows, cols = np.mgrid[:out_side, :out_side]
+    dist_to_center = np.sqrt((rows - radius)**2 + (cols - radius)**2)
+    return 1 * (dist_to_center <= radius)
 
 
-def get_biggest_region(mask):
-    raise NotImplementedError
+
+def draw_disk_from_coords_single(point, initial_mask, radius=5):
+    '''points is a `torch.Tensor` of size (2,)'''
+    assert set(np.unique(initial_mask)).issubset({0, 1})
+    row_ind, col_ind = point[0], point[1]
+    out_mask = copy.copy(initial_mask)
+    out_mask[row_ind-radius:row_ind+radius+1, col_ind-radius:col_ind+radius+1] += simplest_disk(radius)
+    return out_mask
+
+
+def disk_mask_from_coords(points, out_shape, radius=5):
+    out_mask = np.zeros(out_shape, dtype=int)
+    for point in points:
+        out_mask = draw_disk_from_coords_single(point, out_mask, radius=radius)
+    return out_mask
+    
+
+def test_disk_mask_from_coords():
+    import matplotlib.pyplot as plt
+    points = [(130, 120), (200, 20)]
+    out_shape = (256, 256)
+    mask = disk_mask_from_coords(points, out_shape)
+    plt.imshow(mask); plt.savefig('temp.png')
 
 
 def get_d_prob_map(mask, hard_thresh=1e-6):
