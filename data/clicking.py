@@ -21,8 +21,8 @@ def draw_disk_from_coords_single(point, initial_mask, radius=5):
     return out_mask
 
 
-def disk_mask_from_coords(points, out_shape, radius=5):
-    out_mask = np.zeros(out_shape, dtype=int)
+def disk_mask_from_coords(points, prev_mask, radius=5):
+    out_mask = copy.copy(prev_mask)
     for point in points:
         out_mask = draw_disk_from_coords_single(point, out_mask, radius=radius)
     return out_mask
@@ -191,6 +191,25 @@ def visualize_clicks(image, mask, alpha, pc_list, nc_list, name):
     plt.savefig(name + ".png")
     plt.close()
 
+def get_positive_clicks(n, mask, near_border, uniform_probs, erode_iters):
+    if n < 0:
+        return []
+    return [
+        get_positive_click(
+            mask, near_border=near_border, uniform_probs=uniform_probs, erode_iters=erode_iters
+        )
+        for _ in range(n)
+    ]
+
+def get_negative_clicks(n, mask, near_border, uniform_probs, dilate_iters):
+    ncs = [
+        get_negative_click(
+            mask, near_border=near_border, uniform_probs=uniform_probs, dilate_iters=dilate_iters
+        )
+        for _ in range(n)
+    ]
+    return list(filter(lambda x: x is not None, ncs))  # remove None elements
+
 
 def test():
     from data.datasets.coco_lvis import CocoLvisDataset
@@ -214,22 +233,7 @@ def test():
         num_workers=0,
     )
 
-    def get_positive_clicks(n, mask, near_border, uniform_probs, erode_iters):
-        return [
-            get_positive_click(
-                mask, near_border=near_border, uniform_probs=uniform_probs, erode_iters=erode_iters
-            )
-            for _ in range(n)
-        ]
 
-    def get_negative_clicks(n, mask, near_border, uniform_probs, dilate_iters):
-        ncs = [
-            get_negative_click(
-                mask, near_border=near_border, uniform_probs=uniform_probs, dilate_iters=dilate_iters
-            )
-            for _ in range(n)
-        ]
-        return list(filter(lambda x: x is not None, ncs))  # remove None elements
 
     for ind, batch in enumerate(iis_dataloader):
         print(f"index {ind}")

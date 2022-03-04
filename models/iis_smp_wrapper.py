@@ -4,7 +4,7 @@ import torch
 
 # useful for all smp models
 class EarlySMP(torch.nn.Module, smp.encoders._base.EncoderMixin):
-    def __init__(self, smp_model_class, smp_model_kwargs_dict, in_channels=5, classes=2):
+    def __init__(self, smp_model_class, smp_model_kwargs_dict, in_channels=6, classes=2):
         assert smp_model_kwargs_dict.has_key('encoder_weights'), 'Sorry, default behavior is undefined. To use pretrained weights pass "imagenet" as "encoder_weights" value.'
         smp_model_kwargs_dict['in_channels'] = in_channels
         smp_model_kwargs_dict['classes'] = classes

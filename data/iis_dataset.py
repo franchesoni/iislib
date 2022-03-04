@@ -26,7 +26,7 @@ def visualize(img, name):
     plt.close()
 
 
-class SegDataset:
+class SegDataset(torch.utils.data.Dataset):
     """Segmentation dataset structure. Load all datasets subclassing the method and
     defining the `get_sample` method. All masks should be given as output in such a
     deterministic function."""
@@ -59,7 +59,7 @@ class SegDataset:
         return len(self.dataset_samples)
 
 
-class RegionDataset:
+class RegionDataset(torch.utils.data.Dataset):
     """Interactive segmentation dataset, which will yield an image and a target mask when
     queried.
     The image and seed mask come from the `seg_dataset`.
@@ -79,14 +79,14 @@ class RegionDataset:
         self.debug_visualize = debug_visualize
 
     def get_sample(self, index: int):
-        image, all_masks, info = self.seg_dataset.get_sample(index)
+        image, all_masks, info = self.seg_dataset[index]
         if self.debug_visualize:
             visualize(image, "orig_image")
             for layer_ind in range(all_masks.shape[-1]):
                 visualize(all_masks[:, :, layer_ind], f"layer_{layer_ind}")
         target_region = self.region_selector(image, all_masks, info)
         image, target_region = self.augmentator(image, target_region)
-        return image, target_region, info
+        return {'image':image, 'mask':target_region, 'info':info}
 
     def __getitem__(self, index):
         return self.get_sample(index)
@@ -175,7 +175,7 @@ def test():
     iis_dataloader = RegionDataLoader(iis_dataset, batch_size=2, num_workers=0)
     for ind, batch in enumerate(iis_dataloader):
         print(ind)
-        images, masks, infos = batch
+        images, masks, infos = (batch['image'], batch['mask'], batch['info'])
         visualize(images[0], "image")
         visualize(masks[0], "mask")
         breakpoint()
