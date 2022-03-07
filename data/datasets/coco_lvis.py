@@ -63,24 +63,4 @@ class CocoLvisDataset(SegDataset):
         return image, layers, info
 
 
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
 
-    dataset = CocoLvisDataset(
-        "/home/franchesoni/adisk/iis_datasets/datasets/LVIS"
-    )
-    for ind in range(100):
-        sample = dataset.get_sample(ind)
-        assert (
-            dataset.get_sample(ind)[0] == sample[0]
-        ).all()  # check that it works the same always
-        image, layers, info = sample
-        plt.imshow(image)
-        plt.show()
-        plt.savefig("image.png")
-        for idx, layer in enumerate(np.moveaxis(layers, 2, 0)):
-            plt.imshow(layer)
-            plt.show()
-            plt.savefig(f"layer_{idx}.png")
-        print(info)
-        breakpoint()
