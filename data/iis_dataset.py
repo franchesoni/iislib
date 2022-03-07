@@ -32,6 +32,7 @@ class SegDataset(torch.utils.data.Dataset):
     deterministic function."""
 
     def __init__(self):
+        super().__init__()
         self.dataset_samples = (
             None  # dataset should be loaded on the init of the child class
         )
@@ -58,8 +59,7 @@ class SegDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.dataset_samples)
 
-
-class RegionDataset(torch.utils.data.Dataset):
+class RegionDatasetWithInfo(torch.utils.data.Dataset):
     """Interactive segmentation dataset, which will yield an image and a target mask when
     queried.
     The image and seed mask come from the `seg_dataset`.
@@ -73,12 +73,13 @@ class RegionDataset(torch.utils.data.Dataset):
         augmentator=None,
         debug_visualize=False,
     ):
+        super().__init__()
         self.seg_dataset = seg_dataset
         self.region_selector = region_selector
         self.augmentator = (lambda x: x) if augmentator is None else augmentator
         self.debug_visualize = debug_visualize
 
-    def get_sample(self, index: int):
+    def __getitem__(self, index: int):
         image, all_masks, info = self.seg_dataset[index]
         if self.debug_visualize:
             visualize(image, "orig_image")
@@ -86,14 +87,32 @@ class RegionDataset(torch.utils.data.Dataset):
                 visualize(all_masks[:, :, layer_ind], f"layer_{layer_ind}")
         target_region = self.region_selector(image, all_masks, info)
         image, target_region = self.augmentator(image, target_region)
-        return {'image':image, 'mask':target_region, 'info':info}
-
-    def __getitem__(self, index):
-        return self.get_sample(index)
+        return image, target_region, info
 
     def __len__(self):
         return len(self.seg_dataset)
 
+class RegionDataset(RegionDatasetWithInfo):
+    '''Exactly the same as `RegionDatasetWithInfo` but only returning (image, mask) when sampled.'''
+    def __init__(
+        self,
+        seg_dataset,
+        region_selector,
+        augmentator=None,
+        debug_visualize=False,
+    ):
+        super().__init__(seg_dataset, region_selector, augmentator, debug_visualize)
+    
+    def __getitem__(self, index: int):
+        return super()[index][:2]  # only image and mask
+
+
+
+######################################################################################################
+######################################################################################################
+######### all of the things below are to correctly deal with info when dataloading ###################
+######################################################################################################
+######################################################################################################
 
 ### modify DataLoader so that we can get a variable dict in the third output ###
 np_str_obj_array_pattern = re.compile(r"[SaUO]")
@@ -102,11 +121,9 @@ default_collate_err_msg_format = (
     "dicts or lists; found {}"
 )
 
-
-def my_collate_fn(batch):
+def my_collate_subfn(batch):
     r"""Copy of `default_collate` treating dicts differently"""
     r"""Puts each data field into a tensor with outer dimension batch size"""
-
     elem = batch[0]
     elem_type = type(elem)
     if isinstance(elem, collections.abc.Mapping):  # my change
@@ -130,7 +147,7 @@ def my_collate_fn(batch):
             if np_str_obj_array_pattern.search(elem.dtype.str) is not None:
                 raise TypeError(default_collate_err_msg_format.format(elem.dtype))
 
-            return my_collate_fn([torch.as_tensor(b) for b in batch])
+            return my_collate_subfn([torch.as_tensor(b) for b in batch])
         elif elem.shape == ():  # scalars
             return torch.as_tensor(batch)
     elif isinstance(elem, float):
@@ -140,7 +157,7 @@ def my_collate_fn(batch):
     elif isinstance(elem, string_classes):
         return batch
     elif isinstance(elem, tuple) and hasattr(elem, "_fields"):  # namedtuple
-        return elem_type(*(my_collate_fn(samples) for samples in zip(*batch)))
+        return elem_type(*(my_collate_subfn(samples) for samples in zip(*batch)))
     elif isinstance(elem, collections.abc.Sequence):
         # check to make sure that the elements in batch have consistent size
         it = iter(batch)
@@ -148,38 +165,24 @@ def my_collate_fn(batch):
         if not all(len(elem) == elem_size for elem in it):
             raise RuntimeError("each element in list of batch should be of equal size")
         transposed = zip(*batch)
-        return [my_collate_fn(samples) for samples in transposed]
+        return [my_collate_subfn(samples) for samples in transposed]
 
     raise TypeError(default_collate_err_msg_format.format(elem_type))
+
+def my_collate_fn(batch):
+    batch = my_collate_subfn(batch)
+    return {'image':batch[0].permute(0, 3, 1, 2), 'mask':batch[1].permute(0, 3, 1, 2), 'info':batch[2]}
 
 
 class RegionDataLoader(torch.utils.data.DataLoader):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, collate_fn=my_collate_fn)
 
-
-### test things in here and more ###
-def test():
-    from data.datasets.coco_lvis import CocoLvisDataset
-    from data.transformations import RandomCrop
-    from data.region_selector import dummy, random_single
-
-    import pytorch_lightning as pl
-
-    pl.seed_everything(0)
-
-    seg_dataset = CocoLvisDataset("/home/franchesoni/adisk/iis_datasets/datasets/LVIS")
-    region_selector = random_single
-    augmentator = RandomCrop(out_size=(224, 224))
-    iis_dataset = RegionDataset(seg_dataset, region_selector, augmentator)
-    iis_dataloader = RegionDataLoader(iis_dataset, batch_size=2, num_workers=0)
-    for ind, batch in enumerate(iis_dataloader):
-        print(ind)
-        images, masks, infos = (batch['image'], batch['mask'], batch['info'])
-        visualize(images[0], "image")
-        visualize(masks[0], "mask")
-        breakpoint()
+######################################################################################################
+######################################################################################################
+######### all of the things above are to correctly deal with info when dataloading ###################
+######################################################################################################
+######################################################################################################
 
 
-if __name__ == "__main__":
-    test()
+
