@@ -4,19 +4,28 @@ import copy
 import cv2
 
 
-def simplest_disk(radius):
+def np_simplest_disk(radius):
     out_side = radius * 2 + 1
     out = np.zeros((out_side, out_side))
     rows, cols = np.mgrid[:out_side, :out_side]
     dist_to_center = np.sqrt((rows - radius) ** 2 + (cols - radius) ** 2)
     return 1 * (dist_to_center <= radius)
 
+def simplest_disk(radius):
+    out_side = radius * 2 + 1
+    out = torch.zeros((out_side, out_side))
+    rows, cols = torch.meshgrid([torch.arange(out_side)]*2, indexing='ij')
+    dist_to_center = torch.sqrt((rows - radius) ** 2 + (cols - radius) ** 2)
+    return 1 * (dist_to_center <= radius)
+
 
 def draw_disk_from_coords_single(point, initial_mask, radius=5):
     """points is a `torch.Tensor` of size (2,)"""
-    assert set(np.unique(initial_mask)).issubset({0, 1})
+    assert {int(e) for e in set(torch.unique(initial_mask))}.issubset({0, 1})
+    if point is None:  # do nothing
+        return initial_mask
     row_ind, col_ind = point[0], point[1]
-    out_mask = copy.copy(initial_mask)
+    out_mask = initial_mask.clone()
     top_offset = max(radius - row_ind, 0)  # put disk considering this left offset
     left_offset = max(radius - col_ind, 0)  # put disk considering this top offset
     bottom_offset = max(
@@ -28,7 +37,7 @@ def draw_disk_from_coords_single(point, initial_mask, radius=5):
     out_mask[
         row_ind - radius + top_offset : row_ind + radius + 1 - bottom_offset,
         col_ind - radius + left_offset : col_ind + radius + 1 - right_offset,
-    ] = np.logical_or(
+    ] = torch.logical_or(
         out_mask[
             row_ind - radius + top_offset : row_ind + radius + 1 - bottom_offset,
             col_ind - radius + left_offset : col_ind + radius + 1 - right_offset,
@@ -36,7 +45,7 @@ def draw_disk_from_coords_single(point, initial_mask, radius=5):
         simplest_disk(radius)[
             top_offset : 2 * radius + 1 - bottom_offset,
             left_offset : 2 * radius + 1 - right_offset,
-        ],
+        ].to(out_mask.device),  # added this to put this new tensor on the same device 
     )
     return out_mask
 
@@ -52,11 +61,11 @@ def disk_mask_from_coords_batch(pointss, prev_masks, radius=5):
     out_masks = []
     for ind in range(len(pointss)):
         points, prev_mask = pointss[ind], prev_masks[ind][0]  # from one batch
-        out_mask = copy.copy(prev_mask)
+        out_mask = prev_mask.clone()
         for point in points:
             out_mask = draw_disk_from_coords_single(point, out_mask, radius=radius)
         out_masks.append(out_mask)
-    return np.stack(out_masks)
+    return torch.stack(out_masks)
 
 
 def test_disk_mask_from_coords():
@@ -97,7 +106,7 @@ def get_point_from_mask(mask, hard_thresh=1e-6):
 
 def positive_erode(mask, erode_iters=15):
     """Get smaller mask"""
-    mask = np.array(mask)
+    mask = np.array(mask.cpu())
     kernel = np.ones((3, 3), dtype=np.uint8)
     eroded_mask = cv2.erode(
         mask.astype(np.uint8), kernel, iterations=erode_iters
@@ -129,7 +138,7 @@ def get_outside_border_mask(mask, dilate_iters=15, safe=True):
 def safe_erode(mask, erode_iters, thresh=0.7):
     """Erode but maintaining an area at least equal to thresh times the original area"""
     masked_area, eroded = mask.sum(), 0
-    while np.sum(eroded) < thresh * masked_area:
+    while np.sum(eroded) <= thresh * masked_area:
         eroded = positive_erode(mask, erode_iters=erode_iters)
         erode_iters = erode_iters // 2
     assert thresh * masked_area < eroded.sum(), "Too much erosion!"
@@ -185,6 +194,8 @@ def get_positive_click(mask, near_border=False, uniform_probs=False, erode_iters
     `not near_border and uniform_probs and (erode_iters==0)` means sampling uniformly from everywhere
     Note that border is internal border of mask.
     """
+    if mask.sum() == 0:
+        return None  # no mask from where to sample click
     eroded, is_same = safe_erode(mask, erode_iters)
     assert (not near_border) or (
         near_border and uniform_probs
@@ -229,20 +240,23 @@ def visualize_clicks(image, mask, alpha, pc_list, nc_list, name):
 def get_positive_clicks_batch(
     n, masks, near_border=False, uniform_probs=False, erode_iters=15
 ):
-    if n <= 0:
+    if n == 0:
         return [[] for _ in range(masks.shape[0])]
-    return [
-        [
-            get_positive_click(
-                mask[0],
-                near_border=near_border,
-                uniform_probs=uniform_probs,
-                erode_iters=erode_iters,
-            )
-            for _ in range(n)
+    elif n < 0:
+        raise ValueError(f'`n` should be positive but is {n}')
+    else:
+        return [
+            [
+                get_positive_click(
+                    mask[0],
+                    near_border=near_border,
+                    uniform_probs=uniform_probs,
+                    erode_iters=erode_iters,
+                )
+                for _ in range(n)
+            ]
+            for mask in masks  
         ]
-        for mask in masks
-    ]
 
 
 
