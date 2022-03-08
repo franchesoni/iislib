@@ -1,12 +1,48 @@
 from pathlib import Path
 import pickle
+import os
+import bisect
 import random
+from unittest import removeResult
 import numpy as np
 import cv2
 from copy import deepcopy
 
 from data.iis_dataset import SegDataset
 
+
+def drop_from_first_if_not_in_second(alist: list, blist: list, fn_a=None, fn_b=None) -> list:
+    '''this works for sorted lists over which we apply fn_a and fn_b (and remain sorted)'''
+    assert type(alist) == type(blist) == list
+    assert alist == sorted(alist) and blist == sorted(blist), 'input lists should be sorted'
+    if fn_a is None:
+        fn_a = lambda x: x  # identity
+    if fn_b is None:
+        fn_b = lambda x: x  # identity
+
+    aa = [fn_a(e) for e in alist]
+    bb = [fn_b(e) for e in blist]
+
+    assert aa == sorted(set(aa)) and bb == sorted(set(bb)), 'resulting lists after fn should be of unique elements and be sorted'
+
+    indices_to_remove = []
+    ia, ib = 0, 0
+    while ia < len(aa) and ib < len(bb):
+        if bb[ib] < aa[ia]:  # b is smaller, advance ib until it's not anymore
+            ib += 1
+        elif aa[ia] == bb[ib]:  # they are equal, it's ok, advance a
+            ia += 1
+        elif aa[ia] < bb[ib]:  # b became greater because a is not in blist, remove a
+            indices_to_remove.append(ia)
+            ia += 1
+
+    if ib == len(bb):  # the blist ended: at the previous ib, b was smaller than a, which means that a and all the following should be removed
+        while ia < len(aa):
+            indices_to_remove.append(ia)
+            ia += 1
+    
+    return [e for ind, e in enumerate(alist) if ind not in indices_to_remove], indices_to_remove
+           
 
 class CocoLvisDataset(SegDataset):
     """Tricky dataset.
@@ -34,6 +70,14 @@ class CocoLvisDataset(SegDataset):
         self._masks_path = self._split_path / "masks"
         with open(self._split_path / anno_file, "rb") as f:
             self.dataset_samples = sorted(pickle.load(f).items())
+        # filter out those names that are not present in the actual data
+        self.available_images = sorted(os.listdir(self._images_path))
+        self.dataset_samples, _ = drop_from_first_if_not_in_second(self.dataset_samples, self.available_images, fn_a=lambda dsample: dsample[0] + '.jpg')
+
+        # # to inspect, uncomment below
+        # ds, removed_indices = drop_from_first_if_not_in_second(self.dataset_samples, self.available_images, fn_a=lambda dsample: dsample[0] + '.jpg')
+        # removed_entries = [e for i, e in enumerate(self.dataset_samples) if i in removed_indices]
+
 
     def get_sample(self, index):
         image_id, sample = self.dataset_samples[index]
