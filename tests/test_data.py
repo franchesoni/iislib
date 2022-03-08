@@ -91,3 +91,33 @@ def test_data__clicking():
         )
         visualize_clicks(images[0], masks[:1], 0.3, pcs, ncs, "vis4")
         breakpoint()
+
+def test_datasets__coco_lvis__drop_from_first_if_not_in_second():
+    from data.datasets.coco_lvis import drop_from_first_if_not_in_second
+    alist = list(range(10))  # always the same
+
+    blist = [0, 1, 3, 4, 7, 9]
+    expected = [a for a in alist if a in blist]
+    output, _ = drop_from_first_if_not_in_second(alist, blist)
+    assert  output == expected, f'{alist}, {blist}, {expected}, {output}'
+
+    blist = [0, 1, 3, 4, 7]
+    expected = [a for a in alist if a in blist]
+    output, _ = drop_from_first_if_not_in_second(alist, blist)
+    assert  output == expected, f'{alist}, {blist}, {expected}, {output}'
+
+    blist = [1, 3, 4, 7, 9]
+    expected = [a for a in alist if a in blist]
+    output, _ = drop_from_first_if_not_in_second(alist, blist)
+    assert  output == expected, f'{alist}, {blist}, {expected}, {output}'
+
+    blist = list(range(-3, 5))
+    expected = [a for a in alist if a in blist]
+    output, _ = drop_from_first_if_not_in_second(alist, blist)
+    assert  output == expected, f'{alist}, {blist}, {expected}, {output}'
+
+    blist = list(range(6, 13))
+    expected = [a for a in alist if a in blist]
+    output, _ = drop_from_first_if_not_in_second(alist, blist)
+    assert  output == expected, f'{alist}, {blist}, {expected}, {output}'
+
