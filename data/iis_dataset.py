@@ -93,7 +93,10 @@ class RegionDatasetWithInfo(torch.utils.data.Dataset):
         return len(self.seg_dataset)
 
 class RegionDataset(RegionDatasetWithInfo):
-    '''Exactly the same as `RegionDatasetWithInfo` but only returning (image, mask) when sampled.'''
+    '''
+    Exactly the same as `RegionDatasetWithInfo` but returning {'image':image, 'mask':mask} when sampled (C, H, W).
+    This is the same output (without 'info' key) that when using `RegionDataloader` over `RegionDatasetWithInfo`
+    '''
     def __init__(
         self,
         seg_dataset,
@@ -104,7 +107,8 @@ class RegionDataset(RegionDatasetWithInfo):
         super().__init__(seg_dataset, region_selector, augmentator, debug_visualize)
     
     def __getitem__(self, index: int):
-        return super()[index][:2]  # only image and mask
+        image, mask, info = super().__getitem__(index)
+        return {'image':image, 'mask':mask}
 
 
 
