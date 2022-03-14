@@ -1,3 +1,5 @@
+
+import numpy as np
 from copy import deepcopy 
 from torchvision.transforms import CenterCrop
 import albumentations as A
@@ -24,4 +26,21 @@ class Dummy:
 
     def __call__(self, image, mask):
         return image, mask
+
+def to_np(img, to_01=True):
+    if 3 <= len(img.shape):  # if has more than 3-d, manually squeeze
+        out = img
+        while 3 < len(out.shape):
+            out = out[0]
+    else:
+        out = img[None]  # if has 2-d, expand
+    out = (
+        out.permute(1, 2, 0) if out.shape[0] < 5 else out
+    )  # assume images bigger than (H=5, W=5)  # swap channels if first dim is small
+    out = np.array(out)  # convert to array
+    if to_01:  # take to [0, 1] assuming [0, 255] if 1 < max(img)
+        out = out / 255 if 1 < out.max() else out
+    else:  # assume [0, 255] and cast if 1 < max(img)
+        out = out.astype(np.uint8) if 1 < out.max() else out
+    return out
 

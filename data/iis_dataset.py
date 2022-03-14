@@ -104,6 +104,7 @@ class EvaluationDataset(RegionDataset):
         debug_visualize=False,
     ):
         assert type(seg_dataset).__name__ in ['BerkeleyDataset', 'GrabCutDataset'], f'{type(seg_dataset).__name__} is not suited for evaluation.'
+        assert region_selector == dummy, 'Region selector should be `dummy`'
         super().__init__(seg_dataset, region_selector, augmentator, debug_visualize)
     
 
