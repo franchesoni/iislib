@@ -63,6 +63,7 @@ class CocoLvisDataset(SegDataset):
         stuff_prob=0.0,
         anno_file="hannotation.pickle",
     ):
+        super().__init__()
         dataset_path = Path(dataset_path)
         self._split_path = dataset_path / split
         self.split = split
@@ -73,6 +74,7 @@ class CocoLvisDataset(SegDataset):
         # filter out those names that are not present in the actual data
         self.available_images = sorted(os.listdir(self._images_path))
         self.dataset_samples, _ = drop_from_first_if_not_in_second(self.dataset_samples, self.available_images, fn_a=lambda dsample: dsample[0] + '.jpg')
+        self.check_sample()
 
         # # to inspect, uncomment below
         # ds, removed_indices = drop_from_first_if_not_in_second(self.dataset_samples, self.available_images, fn_a=lambda dsample: dsample[0] + '.jpg')
