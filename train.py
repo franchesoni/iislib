@@ -4,7 +4,7 @@ import pytorch_lightning as pl
 
 def get_dataloaders(num_workers=12, batch_size=256):
     from data.datasets.coco_lvis import CocoLvisDataset
-    from data.transformations import RandomCrop
+    from data.transforms import RandomCrop
     from data.region_selector import random_single
     from data.iis_dataset import RegionDataset, RegionDataLoader
 
@@ -37,7 +37,7 @@ def get_dataloaders(num_workers=12, batch_size=256):
 def get_model(num_workers=4, batch_size=8, hacky=False):
     import segmentation_models_pytorch as smp
     from models.lightning import LitIIS
-    from models.iis_smp_wrapper import EarlySMP
+    from models.wrappers.iis_smp_wrapper import EarlySMP
     from engine.metrics import mse
 
     lit_model = LitIIS(

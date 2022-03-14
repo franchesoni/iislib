@@ -4,10 +4,10 @@ def test_training_logic():
     import segmentation_models_pytorch as smp
 
     from data.datasets.coco_lvis import CocoLvisDataset
-    from data.transformations import RandomCrop
+    from data.transforms import RandomCrop
     from data.region_selector import random_single
     from data.iis_dataset import RegionDataset, visualize, RegionDataLoader
-    from models.iis_smp_wrapper import EarlySMP
+    from models.wrappers.iis_smp_wrapper import EarlySMP
     from engine.training_logic import interact
 
     pl.seed_everything(0)

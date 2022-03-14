@@ -1,29 +1,9 @@
 import collections
 import re
+from data.region_selector import dummy
 import torch
 from torch._six import string_classes
 import matplotlib.pyplot as plt
-
-
-def scin(img):
-    """Swap Channels If Needed (scin)"""
-    assert img.ndim == 3, "An image has 3 dimensions! (C, H, W) or (H, W, C)"
-    if type(img) is torch.Tensor and min(img.shape) == img.shape[0]:
-        return img.permute(2, 1, 0)
-    elif min(img.shape) == img.shape[-1]:
-        return img
-    else:
-        raise RuntimeError(f"Image has shape {img.shape} which is strange")
-
-
-def visualize(img, name):
-    """Save image as png"""
-    plt.figure()
-    plt.imshow(img)
-    plt.axis("off")
-    plt.grid()
-    plt.savefig(name + ".png")
-    plt.close()
 
 
 class SegDataset(torch.utils.data.Dataset):
@@ -49,8 +29,9 @@ class SegDataset(torch.utils.data.Dataset):
         assert (
             image.shape[2] == 3
         ), f"Image should be RGB with channels last but its shape is {image.shape}"
+        assert len(masks.shape) == 3, f"Masks should be (H, W, C) but its shape is {masks.shape}"
         assert (
-            image.shape[:2] == masks[:2]
+            image.shape[:2] == masks.shape[:2]
         ), "Image and masks should have the same shape but their shapes are {image.shape} and {masks.shape}"
 
     def __getitem__(self, index):
@@ -58,6 +39,8 @@ class SegDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.dataset_samples)
+
+
 
 class RegionDatasetWithInfo(torch.utils.data.Dataset):
     """Interactive segmentation dataset, which will yield an image and a target mask when
@@ -109,6 +92,21 @@ class RegionDataset(RegionDatasetWithInfo):
     def __getitem__(self, index: int):
         image, mask, info = super().__getitem__(index)
         return {'image':image, 'mask':mask}
+
+class EvaluationDataset(RegionDataset):
+    '''Exactly the same as `RegionDataset` but checks if database has binary mask as ground truth.
+    Otherwise the evaluation is more complicated and is not implemented.'''
+    def __init__(
+        self,
+        seg_dataset,
+        region_selector=dummy,
+        augmentator=None,
+        debug_visualize=False,
+    ):
+        assert type(seg_dataset).__name__ in ['BerkeleyDataset', 'GrabCutDataset'], f'{type(seg_dataset).__name__} is not suited for evaluation.'
+        super().__init__(seg_dataset, region_selector, augmentator, debug_visualize)
+    
+
 
 
 
@@ -187,6 +185,28 @@ class RegionDataLoader(torch.utils.data.DataLoader):
 ######### all of the things above are to correctly deal with info when dataloading ###################
 ######################################################################################################
 ######################################################################################################
+
+
+
+def scin(img):
+    """Swap Channels If Needed (scin)"""
+    assert img.ndim == 3, "An image has 3 dimensions! (C, H, W) or (H, W, C)"
+    if type(img) is torch.Tensor and min(img.shape) == img.shape[0]:
+        return img.permute(2, 1, 0)
+    elif min(img.shape) == img.shape[-1]:
+        return img
+    else:
+        raise RuntimeError(f"Image has shape {img.shape} which is strange")
+
+
+def visualize(img, name):
+    """Save image as png"""
+    plt.figure()
+    plt.imshow(img)
+    plt.axis("off")
+    plt.grid()
+    plt.savefig(name + ".png")
+    plt.close()
 
 
 

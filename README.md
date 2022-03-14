@@ -6,6 +6,26 @@ This is a library that exposes simple but powerful modules to do research on Int
 
 In an IIS system we have many components, organized as the folders of the project or implementing one of the decisions below.
 
+## High level overview
+This framework is aimed at researchers on IIS. An IIS step can be summarized in:
+1. grab an image and (optionally) a segmentation candidate
+2. oracle annotates the image (e.g. robot click)
+3. image and annotation are given to model, which produces a new segmentation candidate
+
+This can be further divided in smaller blocks. If we assume that the annotation is a robot click, we have that we can evaluate a model over a segmentation database as in the following **pseudocode**:
+
+```python
+for img, gt_mask in segmentation_database:
+    target_region = sample_region(gt_mask)
+    prev_output = zeros_like(gt_mask)
+    for interaction_ind in range(interaction_steps):
+        clicks = robot_click(prev_output, target_region)
+        aux_input = encode_aux(clicks, prev_output)
+        prev_output = model(img, aux_input)
+    save_metrics(prev_output, target_region)
+```
+different choices for `sample_region` / `robot_click` / `encode_aux` / `model` will provide different results.
+
 ## Run
 Each script has a `test` function which is usually called when running the script directly. For instance, you can run `python -m data.clicking` and see what happens :)
 
@@ -49,3 +69,57 @@ The organization gives room for many decisions to be made. For instance:
 
 - use fast jpeg reader instead of opencv
 - profile and reduce training time of full example
+
+## Datasets
+One should note that datasets are different and it is not straightforward to evaluate them in general. It is easier for those who have a binary mask.
+
+
+- data
+    - transforms
+    - RegionDataset (for training)
+        - segmentation dataset 
+        - region selector (random)
+    - EvaluationDataset (for testing)
+        - segmentation dataset 
+        - region selector (trivial, as we use only some segmentation datasets)
+
+- Clicking
+    - utilities: sample uniformly, get largest region, etc.
+    - robots
+        - input: prediction, real mask, past clicks
+        - output: click(s)
+        - training types: random, random false, random target false, center 99
+        - evaluation types: random, random false, random largest false, center 99, complicated RITM
+    - encodings
+        - disk encoding 
+
+- Engine 
+    - training logic
+        - training steps: interact some steps, learn how to best correct
+    - metrics
+        - those in openMM
+
+- models
+    - lightning.py
+    - wrappers
+        - openmm
+        - smp
+    - custom models
+        - ritm
+        - 99
+    
+- tests
+- train model
+- evaluate model
+
+## tasks
+- evaluate a pretrained or not pretrained model over one clicking scheme
+- evaluate 99
+- evaluate ritm
+- implement other clicking schemes
+added:
+- move get_positive_clicks_batch into a robot
+- move smp wrapper inside wrappers
+
+done
+- reorganize the code a little

@@ -2,7 +2,7 @@ import torch
 
 def test_data__iis_dataset():
     from data.datasets.coco_lvis import CocoLvisDataset
-    from data.transformations import RandomCrop
+    from data.transforms import RandomCrop
     from data.region_selector import random_single
     from data.iis_dataset import RegionDataset, visualize
 
@@ -48,7 +48,7 @@ def test_data__datasets__coco_lvis():
 
 def test_data__clicking():
     from data.datasets.coco_lvis import CocoLvisDataset
-    from data.transformations import RandomCrop
+    from data.transforms import RandomCrop
     from data.region_selector import random_single
     from data.iis_dataset import RegionDataset, visualize, scin
     from data.clicking import get_positive_clicks_batch, visualize_clicks
