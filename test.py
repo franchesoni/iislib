@@ -14,7 +14,6 @@ from data.iis_dataset import EvaluationDataset
 from engine.metrics import eval_metrics
 
 
-
 """Testing of any method
 - Loads batches from an EvaluationDataset
 - Runs the IIS with some `robot` and saving results
@@ -24,7 +23,6 @@ from engine.metrics import eval_metrics
 def to_np(img):
     if 3 <= len(img.shape):
         out = img
-
         while 3 < len(out.shape):
             out = out[0]
     else:
@@ -47,7 +45,39 @@ def get_model():
         str(logs_dir / f"version_{last_version}" / "checkpoints") + "/*"
     )[0]
     model = LitIIS.load_from_checkpoint(checkpoint_path)
-    return model
+    encoding_fn = encode_disks
+
+    def fwd_lit_iis(image, z, pcs, ncs):
+        pos_encoding, neg_encoding = z["pos_encoding"], z["neg_encoding"]
+        pos_encoding, neg_encoding = encode_clicks(
+            pcs, ncs, encoding_fn, pos_encoding, neg_encoding
+        )
+        x, aux = image, torch.cat((pos_encoding, neg_encoding, z["prev_output"]), dim=1)
+        prev_output = torch.sigmoid(model(x, aux))
+        return prev_output, {
+            "prev_output": prev_output,
+            "pos_encoding": pos_encoding,
+            "neg_encoding": neg_encoding,
+        }
+
+    def initialize_z(image, target):
+        prev_output = torch.zeros_like(image[:, :1])
+        pos_encoding, neg_encoding = [prev_output.clone()] * 2
+        return {
+            "prev_output": prev_output,
+            "pos_encoding": pos_encoding,
+            "neg_encoding": neg_encoding,
+        }
+
+    def initialize_y(image, target):
+        return torch.zeros_like(image[:, :1])
+
+    return fwd_lit_iis, initialize_z, initialize_y
+
+def get_model_99():
+    from models.custom.gto99.customized import gto99, initialize_y, initialize_z
+    return gto99, initialize_z, initialize_y
+
 
 def get_sample(dataset, sample_ind):
     img, mask = (
@@ -58,51 +88,64 @@ def get_sample(dataset, sample_ind):
     assert len(img.shape) == len(mask.shape) == 3
     return augmentator(img, mask)
 
+
 def augmentator(img, mask, new_shape=None):
     img, mask = (
         torch.Tensor(img).permute(2, 0, 1),
         torch.Tensor(mask).squeeze()[None],
     )
     if new_shape is None:
-        new_shape = [min(img.shape[-2:])] * 2  # (224, 224)  #tuple(32*(side//32) for side in img.shape[-2:])
+        new_shape = [
+            min(img.shape[-2:])
+        ] * 2  # (224, 224)  #tuple(32*(side//32) for side in img.shape[-2:])
     img, mask = center_crop(img, new_shape), center_crop(mask, new_shape)
-    img, mask = resize(img, (224, 224), torchvision.transforms.InterpolationMode.NEAREST), resize(mask, (224, 224), torchvision.transforms.InterpolationMode.NEAREST)
+    img, mask = resize(
+        img, (224, 224), torchvision.transforms.InterpolationMode.NEAREST
+    ), resize(mask, (224, 224), torchvision.transforms.InterpolationMode.NEAREST)
     return img, mask
+
 
 def get_dataset():
     from data.datasets.berkeley import BerkeleyDataset
-    seg_dataset = BerkeleyDataset("/home/franchesoni/adisk/iis_datasets/datasets/Berkeley")
+
+    seg_dataset = BerkeleyDataset(
+        "/home/franchesoni/adisk/iis_datasets/datasets/Berkeley"
+    )
     ds = EvaluationDataset(seg_dataset, augmentator=augmentator)
     return ds
 
 
 def test():
     max_n_clicks = 4
-    encoding_fn = encode_disks  
     compute_scores = eval_metrics
 
     robot = robot_01
-    model = get_model()
+    model, init_z, init_y = get_model_99()
     ds = get_dataset()
-    dl = torch.utils.data.DataLoader(ds, batch_size=2)
+    dl = torch.utils.data.DataLoader(ds, batch_size=1)
     scores = []
 
-    with torch.no_grad():  # dont use this line in general
-        for bi, batch in enumerate(dl):
-            image, target = batch["image"], batch["mask"]
-            prev_output = torch.zeros_like(image[:, :1])
-            pos_encoding, neg_encoding = [prev_output.clone()]*2
-            pcs, ncs = [], []
-            scores.append([])
+    for bi, batch in enumerate(dl):
+        image, target = batch["image"], batch["mask"]  # (B, C, H, W)
 
-            for iter_ind in range(max_n_clicks):
-                pcs, ncs = robot(prev_output, target, n_points=1, pcs=pcs, ncs=ncs)
-                pos_encoding, neg_encoding = encode_clicks(pcs, ncs, encoding_fn, pos_encoding, neg_encoding)
-                x, aux = image, torch.cat((pos_encoding, neg_encoding, prev_output), dim=1)
-                prev_output = torch.sigmoid(model(x, aux))
-                ss = compute_scores(1*(0.5 < prev_output), target, num_classes=1, ignore_index=0, metrics=['mIoU', 'mDice', 'mFscore'])
-                scores[-1].append(ss)
-                print(f'done with batch {bi} click {iter_ind}')
+        z = init_z(image, target)
+        y = init_y(image, target)  # (B, 1, H, W)
+        pcs, ncs = [], []  # two click_seq
+        scores.append([])
+
+        for iter_ind in range(max_n_clicks):
+            pcs, ncs = robot(y, target, n_points=1, pcs=pcs, ncs=ncs)
+            y, z = model(image, z, pcs, ncs)  # (B, 1, H, W), z
+
+            ss = compute_scores(
+                1 * (0.5 < y),
+                target,
+                num_classes=1,
+                ignore_index=0,
+                metrics=["mIoU", "mDice", "mFscore"],
+            )
+            scores[-1].append(ss)
+            print(f"done with batch {bi} click {iter_ind}")
 
 
 def try_one_image(sample_ind=0, seed=0):
@@ -140,5 +183,6 @@ def try_one_image(sample_ind=0, seed=0):
 
     breakpoint()
 
-if __name__=='__main__':
+
+if __name__ == "__main__":
     test()
