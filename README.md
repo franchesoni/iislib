@@ -3,114 +3,87 @@
 
 This is a library that exposes simple but powerful modules to do research on Interactive Image Segmentation (IIS) using deep learning (DL).
 
+In an IIS system we have many components, organized as the folders of the project. Here I'll explain the high level interrelations between the components.
 
-In an IIS system we have many components, organized as the folders of the project or implementing one of the decisions below.
-
-## High level overview
+## IIS in a nutshell
 This framework is aimed at researchers on IIS. An IIS step can be summarized in:
-1. grab an image and (optionally) a segmentation candidate
+1. grab an image and (when training) the corresponding segmentation mask
 2. oracle annotates the image (e.g. robot click)
 3. image and annotation are given to model, which produces a new segmentation candidate
 
-This can be further divided in smaller blocks. If we assume that the annotation is a robot click, we have that we can evaluate a model over a segmentation database as in the following **pseudocode**:
+In practice an annotation is a set of positive/negative clicks and there are variables that are reused by the model. An IIS model $f$ is then
+$$\hat{y}_{k+1}, z_{k+1} = f(x, z_k, [c_0, \dots, c_k]) $$
+where $x$ is the input image, $z$ is an auxiliary  variable (e.g. $z_k = \hat{y}_k$), and $c_k$ are the clicks made at interaction step $k$. 
 
+The *pseudocode* for a full inference is the following
 ```python
-for img, gt_mask in segmentation_database:
-    target_region = sample_region(gt_mask)
-    prev_output = zeros_like(gt_mask)
-    for interaction_ind in range(interaction_steps):
-        clicks = robot_click(prev_output, target_region)
-        aux_input = encode_aux(clicks, prev_output)
-        prev_output = model(img, aux_input)
-    save_metrics(prev_output, target_region)
+def full_inference(image, target, K):
+    # initialization
+    click_seq = []
+    z = initialize_z(image, target)
+    y = initialize_y(image, target)
+
+    # inference
+    for k in [0, ..., K-1]:
+        clicks_k = oracle(y, target, click_seq)  # annotate
+        click_seq.append(clicks_k)
+        y, z = model(image, z, click_seq)  # predict 
+    return y
 ```
-different choices for `sample_region` / `robot_click` / `encode_aux` / `model` will provide different results.
 
-## Run
-Each script has a `test` function which is usually called when running the script directly. For instance, you can run `python -m data.clicking` and see what happens :)
+### IF THEN ELSE
 
+*Want to use another dataset?*
+
+Subclass `SegDataset` to create a custom loader.
+
+
+### Notes
+- standard model format:
+    ```python
+    def iismodel(x, z, pcs, ncs):
+        # computations ...
+        return y
+    ```
+    `z` can be a dict.
+- full mask is different than target region. Full mask refers to the original segmentation annotation (can hold multiple classes and layers) while target region is a binary mask obtained from full mask. There are many possible target regions given a full mask: random class, random connected region, merging class or regions, background, etc..
 
 ## Structure
 - `data/`
-    - `iis_dataset.py`: Abstract `SegDataset` (to load whatever segmentation dataset you have) and `RegionDataset` classes are here defined. Use them to retrieve image and masks or image and target region, respectively.
+    - `iis_dataset.py`: Classes here defined:
+        - Abstract `SegDataset` (subclass to load whatever segmentation dataset you have). Loads image, full mask and info.
+        - `RegionDatasetWithInfo` loads image, target region and info. There for compatibility, use `RegionDataset` instead.
+        - `RegionDataset` loads image and target region.
+        - `EvaluationDataset` is a `RegionDataset` but it ensures reproducibility (by asking for databases with binary masks).
     - `datasets/`
-        - `dataset_name.py`: each specific dataset is usually an image segmentation dataset and has an specific script to load each image and its corresponding masks. Subclass `SegDataset`
-    - `region_selector.py`: given a dataset script, which retrieves a sample image and its masks, we must select one ground truth mask from between these masks. Different strategies are implemented here.
-    - `clicking.py`: given a ground truth mask, past clicks and a prediction, we compute the next click according to different strategies. The prediction can be empty if it is the first step. This script also implements clicks encoding.
-- `models/`: for us, IIS models are segmentation models with more input channels
-    - `iis_segmenter_wrapper.py`: this is a model that is built upon a segmentation backbone (that maps an RGB image to a mask prediction) and allows for IIS inputs
-    - `iis_representer_wrapper.py`: this is a model that is built upon a feature extractor or representer backbone (that maps an RGB image to a feature vector) and allows for IIS inputs
-    - `backbones/`
-        - `representer/`
-            - `MAE_ViT.py`
-        - `segmenter/`
-            - `HRNet.py`
-    - `iis_models/`
-        - `ritm.py`
+        - `dataset_name.py`: each specific dataset is usually an image segmentation dataset and has an specific script to load each image and its corresponding masks. Subclasses `SegDataset`.
+    - `region_selector.py`: given a dataset script, which retrieves a sample image and its masks, we must select one target mask from between the original masks. Different strategies are implemented here.
+    - `transforms.py`: augmentations and transformations of images or masks
+- `clicking/`
+    outputs,  # (B, C, H, W)
+    targets,
+    n_points=1,
+    pcs=[],  # indexed by (interaction, batch_element, click) 
+    ncs=[],
+    - `robots.py`: Implements clicking robots. Given a ground truth mask, past clicks and a prediction, we compute the next clicks according to different strategies. The prediction can be empty if it is the first step. Examples: random, random false, random largest false, center largest false, 
+    - `encode.py` This script implements clicks encoding, i.e. transforming (i, j) coordinates into a click map (H, W).
+    - `utils.py` All sort of functions dealing with masks.
+- `models/`: for us, IIS models are segmentation models with extra inputs or custom models from external repos.
+    - `wrappers/`: there are powerful segmentation models we can use with some modification. Here we implement wrappers around modules.
+        - `iis_smp_wrapper.py`: Implements early fusion and intermediate fusion for `segmentation_models_pytorch` module.
+        - `iis_openmm_wrapper.py`: Implements early fusion and intermediate fusion for `mmsegmentation` module.
+    - `custom/`: external models coming from external repos that we are not re-implementing.
+        - `gto99/` directory corresponding to *Getting to 99% Accuracy in Interactive Segmentation*. Some little modifications were conducted (e.g. imports)
+            - `customized.py`: exposes the gto99 model in standard format (see Notes)
+    - `lightning.py`: `pytorch_lightning` implementation of a generic model class. Useful for training.
+
 - `engine/`: training loops, metrics, and engineering
     - `metrics.py`: metrics can be computed from ground truth mask vs prediction but also counting the number of clicks is relevant
-    - `training_logic.py`: here goes the various training loops
-- `try_model.py`: script to train and evaluate a model using components from above
-
-I will (try to) use a functional programming approach. This is, most things will be implemented as functions with explicit inputs and outputs (composition over inheritance). However, DL models are naturally better expressed on object-oriented paradigm.
-
-## Decisions
-The organization gives room for many decisions to be made. For instance: 
-- which dataset to use? e.g. new dataset vs recommended COCO_LVIS
-- how to sample ground truth regions from the dataset? e.g. randomly, ignoring background, merging
-- how to sample clicks? (initial and subsequent) e.g. randomly, over error regions, over borders, depending on distance to the border
-- how to encode clicks? e.g. disks, distance maps
-- how to wrap a segmentation model? e.g. early vs late fusion
-- how to wrap a feature extractor? e.g. which upsampler to use
-- which metrics to compute? e.g. mIoU vs n_clicks
-- how to do the training? e.g. iterative
-
-## Future optimizations
-
-- use fast jpeg reader instead of opencv
-- profile and reduce training time of full example
-
-## Datasets
-One should note that datasets are different and it is not straightforward to evaluate them in general. It is easier for those who have a binary mask.
+- `tests/`: some tests that check some functions.
+- `train.py`: script to train a model using components from above
+- `test.py`: script to evaluate a model using components from above
 
 
-- data
-    - transforms
-    - RegionDataset (for training)
-        - segmentation dataset 
-        - region selector (random)
-    - EvaluationDataset (for testing)
-        - segmentation dataset 
-        - region selector (trivial, as we use only some segmentation datasets)
-
-- Clicking
-    - utilities: sample uniformly, get largest region, etc.
-    - robots
-        - input: prediction, real mask, past clicks
-        - output: click(s)
-        - training types: random, random false, random target false, center 99
-        - evaluation types: random, random false, random largest false, center 99, complicated RITM
-    - encodings
-        - disk encoding 
-
-- Engine 
-    - training logic
-        - training steps: interact some steps, learn how to best correct
-    - metrics
-        - those in openMM
-
-- models
-    - lightning.py
-    - wrappers
-        - openmm
-        - smp
-    - custom models
-        - ritm
-        - 99
-    
-- tests
-- train model
-- evaluate model
 
 ## tasks
 - evaluate a pretrained or not pretrained model over one clicking scheme
@@ -121,5 +94,6 @@ added:
 - move get_positive_clicks_batch into a robot
 - move smp wrapper inside wrappers
 
-done
-- reorganize the code a little
+- use fast jpeg reader instead of opencv
+- profile and reduce training time of full example
+
