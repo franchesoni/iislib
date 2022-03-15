@@ -47,6 +47,7 @@ Subclass `SegDataset` to create a custom loader.
     ```
     `z` can be a dict.
 - full mask is different than target region. Full mask refers to the original segmentation annotation (can hold multiple classes and layers) while target region is a binary mask obtained from full mask. There are many possible target regions given a full mask: random class, random connected region, merging class or regions, background, etc..
+- ritm repo: `evaluate_model.py` has the evaluation procedure for the model. However, the model is wrapped into a `predictor` that involves clicking. There are a few predictor classes, for instance `BasePredictor` will use the model (or net) as `self.net(image_nd, points_nd)['instances']`. The other classes are children of this one, so the model is called in the same way (some other optimizations may be done).
 
 ## Structure
 - `data/`

@@ -34,7 +34,7 @@ def robot_01(
     check_masks(outputs, targets)
     i_coord = torch.randint(outputs.shape[-2], (n_points,))
     j_coord = torch.randint(outputs.shape[-1], (n_points,))
-    clicks = zip(i_coord, j_coord)  # same for all elements in batch
+    clicks = list(zip(i_coord, j_coord))  # same for all elements in batch
     is_positive = [targets[:, :, i, j] == 1 for i, j in clicks]  # a bool vector per click
 
     _pcs, _ncs = [], []  # (batch element, click)

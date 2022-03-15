@@ -3,7 +3,6 @@ import re
 from data.region_selector import dummy
 import torch
 from torch._six import string_classes
-import matplotlib.pyplot as plt
 
 
 class SegDataset(torch.utils.data.Dataset):

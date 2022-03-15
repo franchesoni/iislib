@@ -78,6 +78,9 @@ def get_model_99():
     from models.custom.gto99.customized import gto99, initialize_y, initialize_z
     return gto99, initialize_z, initialize_y
 
+def get_model_ritm():
+    from models.custom.ritm.customized import ritm, initialize_y, initialize_z
+    return ritm, initialize_z, initialize_y
 
 def get_sample(dataset, sample_ind):
     img, mask = (
@@ -120,7 +123,7 @@ def test():
     compute_scores = eval_metrics
 
     robot = robot_01
-    model, init_z, init_y = get_model_99()
+    model, init_z, init_y = get_model_ritm()
     ds = get_dataset()
     dl = torch.utils.data.DataLoader(ds, batch_size=1)
     scores = []

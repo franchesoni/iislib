@@ -11,7 +11,6 @@ from models.custom.gto99.networks.models import build_model
 from data.transforms import to_np
 
 
-
 def scale_input(x: np.ndarray, scale_type) -> np.ndarray:
     """Scales so that min side length is 352 and sides are divisible by 8"""
     h, w = x.shape[:2]
@@ -112,5 +111,6 @@ def gto99(x, z, pcs, ncs, model=model):
     # compute output
     image = to_np(image, 0)  # (H, W, 3)
     alpha = torch.Tensor(pred(image, trimap, alpha, model))[None, None, ...]  # (1, 1, H, W)
-    return alpha, {'prev_output': alpha}
+    y, z = alpha, {'prev_output': alpha}
+    return y, z
 
