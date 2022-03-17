@@ -22,15 +22,18 @@ import torch
 from clicking.utils import check_masks
 
 
+
 def robot_01(
-    outputs,  # (B, C, H, W)
-    targets,
+    outputs,  # (B, C, H, W), C=1, contained in [0, 1] (interval)
+    targets,  # (B, C, H, W), C=1, contained in {0, 1} (set)
     n_points=1,
     pcs=[],  # indexed by (interaction, batch_element, click) 
     ncs=[],
-
 ):
-    """Randomly samples according to target only"""
+    """
+    Adds n_points into the lists `pcs` and `ncs` 
+
+    Randomly samples according to target only."""
     check_masks(outputs, targets)
     i_coord = torch.randint(outputs.shape[-2], (n_points,))
     j_coord = torch.randint(outputs.shape[-1], (n_points,))

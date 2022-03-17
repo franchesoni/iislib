@@ -1,6 +1,7 @@
 import torch
 
 from models.custom.ritm.isegm.inference import utils
+from clicking.utils import norm_fn
 
 
 def recursive_len(item):
@@ -82,5 +83,6 @@ model = utils.load_is_model(checkpoint, device="cpu")
 
 
 def ritm(x, z, pcs, ncs, model=model):
+    x = norm_fn(x)
     y, z = predict(model, x, z['prev_prediction'], pcs, ncs)
     return y, z

@@ -9,15 +9,18 @@ import torchvision.transforms
 import pytorch_lightning as pl
 
 from clicking.robots import robot_01
+from clicking.utils import visualize_on_test, norm_fn
 from clicking.encode import encode_clicks, encode_disks
 from data.iis_dataset import EvaluationDataset
-from engine.metrics import eval_metrics
+from engine.metrics import mse, eval_metrics
 
 
 """Testing of any method
 - Loads batches from an EvaluationDataset
 - Runs the IIS with some `robot` and saving results
 """
+
+
 
 
 def to_np(img):
@@ -74,7 +77,7 @@ def get_model():
 
     return fwd_lit_iis, initialize_z, initialize_y
 
-def get_model_99():
+def get_model_gto99():
     from models.custom.gto99.customized import gto99, initialize_y, initialize_z
     return gto99, initialize_z, initialize_y
 
@@ -119,12 +122,20 @@ def get_dataset():
 
 
 def test():
-    max_n_clicks = 4
+    seed = 0
+    model_name = 'ours'
+    max_n_clicks = 20
     compute_scores = eval_metrics
 
     robot = robot_01
-    model, init_z, init_y = get_model_ritm()
+    if model_name == 'ritm':
+        model, init_z, init_y = get_model_ritm()
+    elif model_name == 'gto99':
+        model, init_z, init_y = get_model_gto99()
+    elif model_name == 'ours':
+        model, init_z, init_y = get_model()
     ds = get_dataset()
+    pl.seed_everything(seed)
     dl = torch.utils.data.DataLoader(ds, batch_size=1)
     scores = []
 
@@ -139,52 +150,19 @@ def test():
         for iter_ind in range(max_n_clicks):
             pcs, ncs = robot(y, target, n_points=1, pcs=pcs, ncs=ncs)
             y, z = model(image, z, pcs, ncs)  # (B, 1, H, W), z
+            # visualize_on_test(to_np(image[0]), np.array(target[0][0]), output=np.array(y[0][0].detach()), pcs=pcs, ncs=ncs, name=f'{model_name}_{bi}_{iter_ind}', destdir='tmp_res')
 
             ss = compute_scores(
-                1 * (0.5 < y),
-                target,
+                1*(0.5<norm_fn(y)),
+                norm_fn(target),
                 num_classes=1,
                 ignore_index=0,
                 metrics=["mIoU", "mDice", "mFscore"],
             )
             scores[-1].append(ss)
-            print(f"done with batch {bi} click {iter_ind}")
+            print(f"done with batch {bi} click {iter_ind}, score={ss}")
 
-
-def try_one_image(sample_ind=0, seed=0):
-    pl.seed_everything(seed)
-    model = get_model()
-    ds = get_dataset()
-    img, mask = get_sample(ds, sample_ind)
-
-    from data.iis_dataset import visualize
-    from engine.training_logic import interact_single_step
-
-    visualize(to_np(img), "image")
-    visualize(to_np(mask), "mask")
-    output, pcs, ncs, pc_mask, nc_mask = interact_single_step(
-        True, model, img, mask, prev_output=None
-    )
-    visualize(to_np(output), "output1")
-    visualize(to_np(pc_mask), "pc_mask1")
-    visualize(to_np(nc_mask), "nc_mask1")
-    for i in range(2, 20):
-        output, pcs, ncs, pc_mask, nc_mask = interact_single_step(
-            False,
-            model,
-            img,
-            mask,
-            prev_output=output,
-            pc_mask=pc_mask,
-            nc_mask=nc_mask,
-            pcs=pcs,
-            ncs=ncs,
-        )
-        visualize(to_np(output), f"output_{i}")
-        visualize(to_np(pc_mask), f"pc_mask_{i}")
-        visualize(to_np(nc_mask), f"nc_mask_{i}")
-
-    breakpoint()
+    np.save(f'scores_{model_name}.npy', scores)
 
 
 if __name__ == "__main__":

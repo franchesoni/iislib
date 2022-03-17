@@ -3,14 +3,14 @@ import pytorch_lightning as pl
 
 
 def get_dataloaders(num_workers=12, batch_size=256):
-    from data.datasets.coco_lvis import CocoLvisDataset
+    from data.datasets.sbd import SBDDataset
     from data.transforms import RandomCrop
     from data.region_selector import random_single
-    from data.iis_dataset import RegionDataset, RegionDataLoader
+    from data.iis_dataset import RegionDataset
 
     # train data
-    seg_dataset = CocoLvisDataset(
-        "/home/franchesoni/adisk/iis_datasets/datasets/LVIS", split="train"
+    seg_dataset = SBDDataset(
+        "/home/franchesoni/adisk/iis_datasets/datasets/SBD", split="train"
     )
     region_selector = random_single
     augmentator = RandomCrop(out_size=(224, 224))
@@ -20,8 +20,8 @@ def get_dataloaders(num_workers=12, batch_size=256):
     )
 
     # val data
-    val_seg_dataset = CocoLvisDataset(
-        "/home/franchesoni/adisk/iis_datasets/datasets/LVIS", split="val"
+    val_seg_dataset = SBDDataset(
+        "/home/franchesoni/adisk/iis_datasets/datasets/SBD", split="test"
     )
     val_region_selector = random_single
     val_augmentator = RandomCrop(out_size=(224, 224))
@@ -86,7 +86,7 @@ if __name__ == "__main__":
         auto_lr_find=True,
 
         # debugging options:
-        callbacks=[pl.callbacks.DeviceStatsMonitor()],
+        # callbacks=[pl.callbacks.DeviceStatsMonitor()],
         profiler='simple',
         # profiler=pl.profiler.AdvancedProfiler(filename='profile_report.txt'),
         # fast_dev_run=True,
@@ -96,7 +96,7 @@ if __name__ == "__main__":
     if tune:
         trainer.tune(model)
         trainer.fit(model)
-
-    trainer.fit(
-        model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader
-    )
+    else:
+        trainer.fit(
+            model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader
+        )

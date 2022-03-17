@@ -22,9 +22,9 @@ def test_data__iis_dataset():
         visualize(masks[0], "mask")
         breakpoint()
 
+from .visualization import visualize
 
 def test_data__datasets__coco_lvis():
-    import matplotlib.pyplot as plt
     from data.datasets.coco_lvis import CocoLvisDataset
 
     dataset = CocoLvisDataset(
@@ -36,13 +36,9 @@ def test_data__datasets__coco_lvis():
             dataset.get_sample(ind)[0] == sample[0]
         ).all()  # check that it works the same always
         image, layers, info = sample
-        plt.imshow(image)
-        plt.show()
-        plt.savefig("image.png")
+        visualize(image, 'image')
         for idx, layer in enumerate(np.moveaxis(layers, 2, 0)):
-            plt.imshow(layer)
-            plt.show()
-            plt.savefig(f"layer_{idx}.png")
+            visualize(layer, f'layer_{idx}')
         print(info)
         breakpoint()
 

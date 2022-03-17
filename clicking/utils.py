@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 import torch
 import numpy as np
 import copy
@@ -148,29 +150,7 @@ def get_positive_click(mask, near_border=False, uniform_probs=False, erode_iters
         )  # get weighted from center region
 
 
-norm_fn = lambda x: (x - x.min()) / (x.max() - x.min())
 
-
-def visualize_clicks(image, mask, alpha, pc_list, nc_list, name):
-    import matplotlib.pyplot as plt
-
-    image = norm_fn(np.array(image))
-    mean_color = image.sum((0, 1)) / image.size
-    min_rgb = np.argmin(mean_color)
-    mask_color = np.ones((1, 1, 3)) * np.eye(3)[min_rgb][None, None, :]
-    out = (
-        image / image.max() * (1 - alpha) + mask[:, :, None] * mask_color * alpha
-    )  # add inverted mean color mask
-    plt.figure()
-    plt.imshow(out)
-    plt.axis("off")
-    plt.grid()
-    for pc in pc_list:
-        plt.scatter(pc[1], pc[0], s=10, color="g")
-    for nc in nc_list:
-        plt.scatter(nc[1], nc[0], s=10, color="r")
-    plt.savefig(name + ".png")
-    plt.close()
 
 
 # get_positive_clicks can be made faster by eroding just one time
@@ -211,4 +191,6 @@ def get_negative_clicks(n, mask, near_border, uniform_probs, dilate_iters):
         for _ in range(n)
     ]
     return list(filter(lambda x: x is not None, ncs))  # remove None elements
+
+
 

@@ -3,7 +3,10 @@ import re
 from data.region_selector import dummy
 import torch
 from torch._six import string_classes
+import numpy as np
 
+from data.transforms import norm_fn
+from tests.visualization import visualize
 
 class SegDataset(torch.utils.data.Dataset):
     """Segmentation dataset structure. Load all datasets subclassing the method and
@@ -46,7 +49,8 @@ class RegionDatasetWithInfo(torch.utils.data.Dataset):
     queried.
     The image and seed mask come from the `seg_dataset`.
     `region_selector` will create one ground truth mask from the original mask.
-    `augmentator` transforms image and ground truth mask simultaneously."""
+    `augmentator` transforms image and ground truth mask simultaneously.
+    Output image and mask will be scaled to [0, 1]"""
 
     def __init__(
         self,
@@ -69,7 +73,7 @@ class RegionDatasetWithInfo(torch.utils.data.Dataset):
                 visualize(all_masks[:, :, layer_ind], f"layer_{layer_ind}")
         target_region = self.region_selector(image, all_masks, info)
         image, target_region = self.augmentator(image, target_region)
-        return image, target_region, info
+        return np.array(norm_fn(image), dtype=float), np.array(norm_fn(target_region), dtype=float), info
 
     def __len__(self):
         return len(self.seg_dataset)
@@ -197,16 +201,6 @@ def scin(img):
         return img
     else:
         raise RuntimeError(f"Image has shape {img.shape} which is strange")
-
-
-def visualize(img, name):
-    """Save image as png"""
-    plt.figure()
-    plt.imshow(img)
-    plt.axis("off")
-    plt.grid()
-    plt.savefig(name + ".png")
-    plt.close()
 
 
 

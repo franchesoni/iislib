@@ -40,6 +40,7 @@ class LitIIS(pl.LightningModule):
             batch_idx=batch_idx
         )
         target = batch["mask"]
+        breakpoint()
         loss = self.loss_fn(output.squeeze(), target.squeeze())  # get dimensions right
         self.log("train_loss", loss)
         for metric_name in self.training_metrics:
@@ -55,6 +56,7 @@ class LitIIS(pl.LightningModule):
             clicks_per_step=3,
         )
         target = batch["mask"]
+        breakpoint()
         loss = self.loss_fn(output.squeeze(), target.squeeze())  # get dimensions right
         self.log("val_loss", loss)
         for metric_name in self.validation_metrics:

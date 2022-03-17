@@ -19,7 +19,6 @@ class RandomCrop:
         return tsample['image'], tsample['mask'][:, :, None]  # add one dim
 
 
-
 class Dummy:
     def __init__(self, out_size=None):
         assert out_size is None
@@ -44,3 +43,5 @@ def to_np(img, to_01=True):
         out = out.astype(np.uint8) if 1 < out.max() else out
     return out
 
+
+norm_fn = lambda x: (x - x.min()) / (x.max() - x.min())

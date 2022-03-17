@@ -8,7 +8,11 @@ from copy import deepcopy
 from data.iis_dataset import SegDataset
 
 class SBDDataset(SegDataset):
-    '''Dataset with only one mask layer but with many objects in that layer (sometimes more than 10)'''
+    '''Dataset with only one mask layer but with many objects in that layer (sometimes more than 10)
+    returns:
+        - image (H, W, 3), np.uint8 with max 255
+        - mask (H, W, 1), int32 with max 1
+    '''
     def __init__(
         self,
         dataset_path,
@@ -37,3 +41,4 @@ class SBDDataset(SegDataset):
 
         layers, info = instances_mask, None
         return image, layers, info
+

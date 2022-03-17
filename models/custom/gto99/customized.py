@@ -101,15 +101,15 @@ def gto99(x, z, pcs, ncs, model=model):
     # regenerate trimap at each interaction (although we could do it iteratively)
     trimap = np.zeros((alpha.shape[0], alpha.shape[1], 2))  # (H, W, 2)
     for ncs_at_step in ncs:
-        for nc in ncs_at_step:
+        for nc in ncs_at_step[0]:  # assume batch size = 1
             if nc:  # if some negative click to do
                 trimap[nc[0], nc[1], 0] = 1  
     for pcs_at_step in pcs:
-        for pc in pcs_at_step:
+        for pc in pcs_at_step[0]:
             if pc:
-                trimap[pc[0], pc[1], 0] = 1
+                trimap[pc[0], pc[1], 1] = 1
     # compute output
-    image = to_np(image, 0)  # (H, W, 3)
+    image = to_np(image, to_01=True)  # (H, W, 3)
     alpha = torch.Tensor(pred(image, trimap, alpha, model))[None, None, ...]  # (1, 1, H, W)
     y, z = alpha, {'prev_output': alpha}
     return y, z
