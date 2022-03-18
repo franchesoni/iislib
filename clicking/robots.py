@@ -59,59 +59,59 @@ def robot_01(
 
 
 
-def get_next_points_1(
-    prev_output,
-    gt_mask,
-    n_points=None,
-    prev_pc_mask=None,
-    prev_nc_mask=None,
-    is_first_iter=False,
-    n_positive=None,
-):
-    """Simple point getter.
-    - Adds positive and negative clicks on a random number.
-    - If first iteration, add only positive clicks
-    - Sample points from erroneous regions (false positive or false negative regions)
-    - Sample positive points closer to the center
-    - Sample negative points uniformly
-    - Add these points to previous point masks
-    """
-    # intialize prev clicks at zero if needed
-    prev_pc_mask = torch.zeros_like(gt_mask) if prev_pc_mask is None else prev_pc_mask
-    prev_nc_mask = torch.zeros_like(gt_mask) if prev_nc_mask is None else prev_nc_mask
+# def get_next_points_1(
+#     prev_output,
+#     gt_mask,
+#     n_points=None,
+#     prev_pc_mask=None,
+#     prev_nc_mask=None,
+#     is_first_iter=False,
+#     n_positive=None,
+# ):
+#     """Simple point getter.
+#     - Adds positive and negative clicks on a random number.
+#     - If first iteration, add only positive clicks
+#     - Sample points from erroneous regions (false positive or false negative regions)
+#     - Sample positive points closer to the center
+#     - Sample negative points uniformly
+#     - Add these points to previous point masks
+#     """
+#     # intialize prev clicks at zero if needed
+#     prev_pc_mask = torch.zeros_like(gt_mask) if prev_pc_mask is None else prev_pc_mask
+#     prev_nc_mask = torch.zeros_like(gt_mask) if prev_nc_mask is None else prev_nc_mask
 
-    pos_region = 1 * (
-        prev_output < gt_mask
-    )  # false negative region, i.e. when you predicted 0 but mask was 1
-    neg_region = 1 * (
-        gt_mask < prev_output
-    )  # false positive region, i.e. you predicted 1 but mask was 0
+#     pos_region = 1 * (
+#         prev_output < gt_mask
+#     )  # false negative region, i.e. when you predicted 0 but mask was 1
+#     neg_region = 1 * (
+#         gt_mask < prev_output
+#     )  # false positive region, i.e. you predicted 1 but mask was 0
 
-    if is_first_iter:  # only positive points at first iteration
-        n_positive = n_points
-    elif n_positive is None:  # sample how many positive
-        n_positive = torch.randint(
-            n_points + 1, (1,)
-        )  # anything in [0, n_points]  CORRECT  # how many of the clicks are positive vs negative
+#     if is_first_iter:  # only positive points at first iteration
+#         n_positive = n_points
+#     elif n_positive is None:  # sample how many positive
+#         n_positive = torch.randint(
+#             n_points + 1, (1,)
+#         )  # anything in [0, n_points]  CORRECT  # how many of the clicks are positive vs negative
 
-    pos_clicks = get_positive_clicks_batch(n_positive, pos_region)
-    neg_clicks = get_positive_clicks_batch(
-        n_points - n_positive,
-        neg_region,
-        near_border=False,
-        uniform_probs=True,
-        erode_iters=0,
-    )
-    pc_mask = disk_mask_from_coords_batch(pos_clicks, prev_pc_mask)
-    nc_mask = (
-        disk_mask_from_coords_batch(neg_clicks, prev_nc_mask)
-        if neg_clicks
-        else torch.zeros_like(pc_mask)
-    )
+#     pos_clicks = get_positive_clicks_batch(n_positive, pos_region)
+#     neg_clicks = get_positive_clicks_batch(
+#         n_points - n_positive,
+#         neg_region,
+#         near_border=False,
+#         uniform_probs=True,
+#         erode_iters=0,
+#     )
+#     pc_mask = disk_mask_from_coords_batch(pos_clicks, prev_pc_mask)
+#     nc_mask = (
+#         disk_mask_from_coords_batch(neg_clicks, prev_nc_mask)
+#         if neg_clicks
+#         else torch.zeros_like(pc_mask)
+#     )
 
-    return (
-        pc_mask[:, None, :, :],
-        nc_mask[:, None, :, :],
-        pos_clicks,
-        neg_clicks,
-    )
+#     return (
+#         pc_mask[:, None, :, :],
+#         nc_mask[:, None, :, :],
+#         pos_clicks,
+#         neg_clicks,
+#     )

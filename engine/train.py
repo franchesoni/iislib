@@ -1,3 +1,4 @@
+from clicking.robots import robot_01
 import torch
 import pytorch_lightning as pl
 
@@ -42,6 +43,7 @@ def get_model(num_workers=4, batch_size=8, hacky=False):
 
     lit_model = LitIIS(
         mse,
+        robot_01,
         EarlySMP,
         iis_model_args_list=[
             smp.Unet,
@@ -72,8 +74,8 @@ if __name__ == "__main__":
 
     trainer = pl.Trainer(
         # training options
-        gpus=1,
-        precision=16,
+        # gpus=1,
+        # precision=16,
         max_epochs=1000,
 
         # my options
@@ -89,7 +91,7 @@ if __name__ == "__main__":
         # callbacks=[pl.callbacks.DeviceStatsMonitor()],
         profiler='simple',
         # profiler=pl.profiler.AdvancedProfiler(filename='profile_report.txt'),
-        # fast_dev_run=True,
+        fast_dev_run=True,
         # overfit_batches=10,
     )
 

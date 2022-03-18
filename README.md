@@ -3,51 +3,34 @@
 
 This is a library that exposes simple but powerful modules to do research on Interactive Image Segmentation (IIS) using deep learning (DL).
 
-In an IIS system we have many components, organized as the folders of the project. Here I'll explain the high level interrelations between the components.
+In an IIS system we have many components, organized as the folders of the project. Here I'll explain the high level interrelations between the components. For more details, read the code.
 
 ## IIS in a nutshell
 This framework is aimed at researchers on IIS. An IIS step can be summarized in:
-1. grab an image and (when training) the corresponding segmentation mask
-2. oracle annotates the image (e.g. robot click)
+1. grab an image and the corresponding segmentation mask
+2. oracle annotates the image given a target mask (e.g. robot click)
 3. image and annotation are given to model, which produces a new segmentation candidate
 
-In practice an annotation is a set of positive/negative clicks and there are variables that are reused by the model. An IIS model $f$ is then
-$$\hat{y}_{k+1}, z_{k+1} = f(x, z_k, [c_0, \dots, c_k]) $$
+In practice an annotation is a set of positive/negative clicks and there are auxiliary variables that are used and transformed by the model. An IIS model $f$ is then
+$$\hat{y}_{k+1}, z_{k+1} = f(x, z_k, [c_1, \dots, c_k]) $$
 where $x$ is the input image, $z$ is an auxiliary  variable (e.g. $z_k = \hat{y}_k$), and $c_k$ are the clicks made at interaction step $k$. 
 
 The *pseudocode* for a full inference is the following
 ```python
-def full_inference(image, target, K):
+def full_inference(model, oracle, image, target, K):
     # initialization
     click_seq = []
-    z = initialize_z(image, target)
-    y = initialize_y(image, target)
+    z = model.initialize_z(image, target)
+    y = model.initialize_y(image, target)
 
     # inference
-    for k in [0, ..., K-1]:
+    for k in [1, ..., K]:
         clicks_k = oracle(y, target, click_seq)  # annotate
         click_seq.append(clicks_k)
         y, z = model(image, z, click_seq)  # predict 
     return y
 ```
 
-### IF THEN ELSE
-
-*Want to use another dataset?*
-
-Subclass `SegDataset` to create a custom loader.
-
-
-### Notes
-- standard model format:
-    ```python
-    def iismodel(x, z, pcs, ncs):
-        # computations ...
-        return y
-    ```
-    `z` can be a dict.
-- full mask is different than target region. Full mask refers to the original segmentation annotation (can hold multiple classes and layers) while target region is a binary mask obtained from full mask. There are many possible target regions given a full mask: random class, random connected region, merging class or regions, background, etc..
-- ritm repo: `evaluate_model.py` has the evaluation procedure for the model. However, the model is wrapped into a `predictor` that involves clicking. There are a few predictor classes, for instance `BasePredictor` will use the model (or net) as `self.net(image_nd, points_nd)['instances']`. The other classes are children of this one, so the model is called in the same way (some other optimizations may be done).
 
 ## Structure
 - `data/`
@@ -98,3 +81,23 @@ added:
 - use fast jpeg reader instead of opencv
 - profile and reduce training time of full example
 
+
+---
+
+### IF THEN ELSE
+
+*Want to use another dataset?*
+
+Subclass `SegDataset` to create a custom loader.
+
+
+### Notes
+- standard model format:
+    ```python
+    def iismodel(x, z, pcs, ncs):
+        # computations ...
+        return y
+    ```
+    `z` can be a dict.
+- full mask is different than target region. Full mask refers to the original segmentation annotation (can hold multiple classes and layers) while target region is a binary mask obtained from full mask. There are many possible target regions given a full mask: random class, random connected region, merging class or regions, background, etc..
+- ritm repo: `evaluate_model.py` has the evaluation procedure for the model. However, the model is wrapped into a `predictor` that involves clicking. There are a few predictor classes, for instance `BasePredictor` will use the model (or net) as `self.net(image_nd, points_nd)['instances']`. The other classes are children of this one, so the model is called in the same way (some other optimizations may be done).
