@@ -147,6 +147,7 @@ lightning_logs/
 results/
 tmp_res/
 *.ckpt
+trash/
 
 # Cython debug symbols
 cython_debug/

@@ -1,0 +1,17 @@
+[project]
+name = "iis_framework"
+version = "0.0.1"
+authors = [
+    {email = "marchesoniacland@gmail.com"},
+    {name = "franchesoni"}
+]
+description = "Interactive Image Segmentation research framework"
+readme = "README.rst"
+requires-python = ">=3.8"
+keywords = ["interactive", "image", "segmentation", "annotation", "learning"]
+classifiers = [
+  "Programming Language :: Python"
+]
+
+[project.urls]
+repository = "github.com/franchesoni/iis_framework"
