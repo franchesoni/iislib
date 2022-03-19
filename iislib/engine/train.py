@@ -1,13 +1,13 @@
-from clicking.robots import robot_01
-import torch
 import pytorch_lightning as pl
+import torch
+from clicking.robots import robot_01
 
 
 def get_dataloaders(num_workers=12, batch_size=256):
     from data.datasets.sbd import SBDDataset
-    from data.transforms import RandomCrop
-    from data.region_selector import random_single
     from data.iis_dataset import RegionDataset
+    from data.region_selector import random_single
+    from data.transforms import RandomCrop
 
     # train data
     seg_dataset = SBDDataset(
@@ -37,9 +37,9 @@ def get_dataloaders(num_workers=12, batch_size=256):
 
 def get_model(num_workers=4, batch_size=8, hacky=False):
     import segmentation_models_pytorch as smp
+    from engine.metrics import mse
     from models.lightning import LitIIS
     from models.wrappers.iis_smp_wrapper import EarlySMP
-    from engine.metrics import mse
 
     lit_model = LitIIS(
         mse,
@@ -53,8 +53,12 @@ def get_model(num_workers=4, batch_size=8, hacky=False):
     )
     if hacky:
         # hacky way to be able to tune the lr and batch size
-        LitIIS.train_dataloader = lambda self: get_dataloaders(num_workers=self.num_workers, batch_size=self.batch_size)[0]
-        LitIIS.val_dataloader = lambda self: get_dataloaders(num_workers=self.num_workers, batch_size=self.batch_size)[1]
+        LitIIS.train_dataloader = lambda self: get_dataloaders(
+            num_workers=self.num_workers, batch_size=self.batch_size
+        )[0]
+        LitIIS.val_dataloader = lambda self: get_dataloaders(
+            num_workers=self.num_workers, batch_size=self.batch_size
+        )[1]
         lit_model.num_workers = num_workers
         lit_model.batch_size = batch_size
     return lit_model
@@ -67,29 +71,32 @@ if __name__ == "__main__":
 
     pl.seed_everything(seed)
     if tune:
-        model = get_model(num_workers=num_workers, batch_size=batch_size, hacky=True)
+        model = get_model(
+            num_workers=num_workers, batch_size=batch_size, hacky=True
+        )
     else:
-        train_dataloader, val_dataloader = get_dataloaders(num_workers=num_workers, batch_size=batch_size)
-        model = get_model(num_workers=num_workers, batch_size=batch_size, hacky=False)
+        train_dataloader, val_dataloader = get_dataloaders(
+            num_workers=num_workers, batch_size=batch_size
+        )
+        model = get_model(
+            num_workers=num_workers, batch_size=batch_size, hacky=False
+        )
 
     trainer = pl.Trainer(
         # training options
         # gpus=1,
         # precision=16,
         max_epochs=1000,
-
         # my options
         log_every_n_steps=1,
         deterministic=True,
         benchmark=False,
-
         # optimization options
-        auto_scale_batch_size='binsearch',
+        auto_scale_batch_size="binsearch",
         auto_lr_find=True,
-
         # debugging options:
         # callbacks=[pl.callbacks.DeviceStatsMonitor()],
-        profiler='simple',
+        profiler="simple",
         # profiler=pl.profiler.AdvancedProfiler(filename='profile_report.txt'),
         fast_dev_run=True,
         # overfit_batches=10,
@@ -100,5 +107,7 @@ if __name__ == "__main__":
         trainer.fit(model)
     else:
         trainer.fit(
-            model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader
+            model,
+            train_dataloaders=train_dataloader,
+            val_dataloaders=val_dataloader,
         )

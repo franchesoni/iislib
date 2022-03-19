@@ -1,14 +1,21 @@
-import torch
-import numpy as np
 from tkinter import messagebox
 
+import numpy as np
+import torch
 from models.custom.ritm.isegm.inference import clicker
 from models.custom.ritm.isegm.inference.predictors import get_predictor
 from models.custom.ritm.isegm.utils.vis import draw_with_blend_and_clicks
 
 
 class InteractiveController:
-    def __init__(self, net, device, predictor_params, update_image_callback, prob_thresh=0.5):
+    def __init__(
+        self,
+        net,
+        device,
+        predictor_params,
+        update_image_callback,
+        prob_thresh=0.5,
+    ):
         self.net = net
         self.prob_thresh = prob_thresh
         self.clicker = clicker.Clicker()
@@ -34,28 +41,43 @@ class InteractiveController:
 
     def set_mask(self, mask):
         if self.image.shape[:2] != mask.shape[:2]:
-            messagebox.showwarning("Warning", "A segmentation mask must have the same sizes as the current image!")
+            messagebox.showwarning(
+                "Warning",
+                "A segmentation mask must have the same sizes as the current image!",
+            )
             return
 
         if len(self.probs_history) > 0:
             self.reset_last_object()
 
         self._init_mask = mask.astype(np.float32)
-        self.probs_history.append((np.zeros_like(self._init_mask), self._init_mask))
-        self._init_mask = torch.tensor(self._init_mask, device=self.device).unsqueeze(0).unsqueeze(0)
+        self.probs_history.append(
+            (np.zeros_like(self._init_mask), self._init_mask)
+        )
+        self._init_mask = (
+            torch.tensor(self._init_mask, device=self.device)
+            .unsqueeze(0)
+            .unsqueeze(0)
+        )
         self.clicker.click_indx_offset = 1
 
     def add_click(self, x, y, is_positive):
-        self.states.append({
-            'clicker': self.clicker.get_state(),
-            'predictor': self.predictor.get_states()
-        })
+        self.states.append(
+            {
+                "clicker": self.clicker.get_state(),
+                "predictor": self.predictor.get_states(),
+            }
+        )
 
         click = clicker.Click(is_positive=is_positive, coords=(y, x))
         self.clicker.add_click(click)
-        pred = self.predictor.get_prediction(self.clicker, prev_mask=self._init_mask)
+        pred = self.predictor.get_prediction(
+            self.clicker, prev_mask=self._init_mask
+        )
         if self._init_mask is not None and len(self.clicker) == 1:
-            pred = self.predictor.get_prediction(self.clicker, prev_mask=self._init_mask)
+            pred = self.predictor.get_prediction(
+                self.clicker, prev_mask=self._init_mask
+            )
 
         torch.cuda.empty_cache()
 
@@ -71,8 +93,8 @@ class InteractiveController:
             return
 
         prev_state = self.states.pop()
-        self.clicker.set_state(prev_state['clicker'])
-        self.predictor.set_states(prev_state['predictor'])
+        self.clicker.set_state(prev_state["clicker"])
+        self.predictor.set_states(prev_state["predictor"])
         self.probs_history.pop()
         if not self.probs_history:
             self.reset_init_mask()
@@ -111,8 +133,9 @@ class InteractiveController:
     def reset_predictor(self, predictor_params=None):
         if predictor_params is not None:
             self.predictor_params = predictor_params
-        self.predictor = get_predictor(self.net, device=self.device,
-                                       **self.predictor_params)
+        self.predictor = get_predictor(
+            self.net, device=self.device, **self.predictor_params
+        )
         if self.image is not None:
             self.predictor.set_input_image(self.image)
 
@@ -136,7 +159,9 @@ class InteractiveController:
     def result_mask(self):
         result_mask = self._result_mask.copy()
         if self.probs_history:
-            result_mask[self.current_object_prob > self.prob_thresh] = self.object_count + 1
+            result_mask[self.current_object_prob > self.prob_thresh] = (
+                self.object_count + 1
+            )
         return result_mask
 
     def get_visualization(self, alpha_blend, click_radius):
@@ -144,11 +169,18 @@ class InteractiveController:
             return None
 
         results_mask_for_vis = self.result_mask
-        vis = draw_with_blend_and_clicks(self.image, mask=results_mask_for_vis, alpha=alpha_blend,
-                                         clicks_list=self.clicker.clicks_list, radius=click_radius)
+        vis = draw_with_blend_and_clicks(
+            self.image,
+            mask=results_mask_for_vis,
+            alpha=alpha_blend,
+            clicks_list=self.clicker.clicks_list,
+            radius=click_radius,
+        )
         if self.probs_history:
             total_mask = self.probs_history[-1][0] > self.prob_thresh
             results_mask_for_vis[np.logical_not(total_mask)] = 0
-            vis = draw_with_blend_and_clicks(vis, mask=results_mask_for_vis, alpha=alpha_blend)
+            vis = draw_with_blend_and_clicks(
+                vis, mask=results_mask_for_vis, alpha=alpha_blend
+            )
 
         return vis

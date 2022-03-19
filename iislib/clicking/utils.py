@@ -1,7 +1,8 @@
 from typing import Any, Tuple, Union
-import torch
-import numpy as np
+
 import cv2
+import numpy as np
+import torch
 
 
 def output_target_are_B1HW_in_01(outputs: Any, targets: Any) -> bool:
@@ -11,12 +12,12 @@ def output_target_are_B1HW_in_01(outputs: Any, targets: Any) -> bool:
         (len(outputs.shape) == len(targets.shape) == 4)
         and (outputs.shape[1] == targets.shape[1] == 1)
         and (type(outputs) == type(targets) == torch.Tensor)
-        and (set([int(e) for e in targets.unique()]).issubset({0, 1}))
-        and ((0 <= outputs.min() and outputs.max() <= 1))
+        and ({int(e) for e in targets.unique()}.issubset({0, 1}))
+        and (0 <= outputs.min() and outputs.max() <= 1)
     )
 
 
-def get_d_prob_map(mask: np.ndarray, hard_thresh: float=1e-6) -> np.ndarray:
+def get_d_prob_map(mask: np.ndarray, hard_thresh: float = 1e-6) -> np.ndarray:
     """
     Get probability map depending on l2 distance to background.
 
@@ -25,10 +26,16 @@ def get_d_prob_map(mask: np.ndarray, hard_thresh: float=1e-6) -> np.ndarray:
     If `hard_thresh=1e-6` then return uniform map
     """
     padded_mask = np.pad(mask, ((1, 1), (1, 1)), "constant")
-    dt = cv2.distanceTransform(padded_mask.astype(np.uint8), cv2.DIST_L2, 0)[1:-1, 1:-1]
+    dt = cv2.distanceTransform(padded_mask.astype(np.uint8), cv2.DIST_L2, 0)[
+        1:-1, 1:-1
+    ]
     inner_mask = dt / dt.max()  # map distance to [0, 1], 1 is in the center
-    inner_mask = hard_thresh < inner_mask if (0 < hard_thresh) else inner_mask  # all ones at hard_thresh from the border
-    return inner_mask / max(inner_mask.sum(), 1e-6)  # return normalized probability
+    inner_mask = (
+        hard_thresh < inner_mask if (0 < hard_thresh) else inner_mask
+    )  # all ones at hard_thresh from the border
+    return inner_mask / max(
+        inner_mask.sum(), 1e-6
+    )  # return normalized probability
 
 
 def sample_point(prob_map: np.ndarray) -> np.ndarray:
@@ -38,13 +45,15 @@ def sample_point(prob_map: np.ndarray) -> np.ndarray:
     return np.array(click_coords)
 
 
-def get_point_from_mask(mask: np.ndarray, hard_thresh:float=1e-6)->np.ndarray:
+def get_point_from_mask(
+    mask: np.ndarray, hard_thresh: float = 1e-6
+) -> np.ndarray:
     """Sample point from inside mask"""
     prob_map = get_d_prob_map(mask, hard_thresh=hard_thresh)
     return sample_point(prob_map)
 
 
-def positive_erode(mask:np.ndarray, erode_iters:int=15) -> np.ndarray:
+def positive_erode(mask: np.ndarray, erode_iters: int = 15) -> np.ndarray:
     """Get smaller mask"""
     # mask = np.array(mask.cpu())  # just in case we enter with tensors
     kernel = np.ones((3, 3), dtype=np.uint8)
@@ -54,24 +63,34 @@ def positive_erode(mask:np.ndarray, erode_iters:int=15) -> np.ndarray:
     return 1 * eroded_mask  # this can be too small, be careful
 
 
-def positive_dilate(mask: np.ndarray, dilate_iters:int=15)-> np.ndarray:
+def positive_dilate(mask: np.ndarray, dilate_iters: int = 15) -> np.ndarray:
     """Get larger mask"""
     # mask = np.array(mask)  # mask is a tensor?
     # expand_r = int(np.ceil(expand_ratio * np.sqrt(mask.sum())))  # old line
     kernel = np.ones((3, 3), np.uint8)
-    expanded_mask = cv2.dilate(mask.astype(np.uint8), kernel, iterations=dilate_iters)
+    expanded_mask = cv2.dilate(
+        mask.astype(np.uint8), kernel, iterations=dilate_iters
+    )
     return 1 * expanded_mask
 
-def safe_erode(mask:np.ndarray, erode_iters:int, thresh:float=0.7) -> np.ndarray:
+
+def safe_erode(
+    mask: np.ndarray, erode_iters: int, thresh: float = 0.7
+) -> np.ndarray:
     """Erode but maintaining an area at least equal to thresh times the original area"""
     masked_area, eroded = mask.sum(), 0
-    while np.sum(eroded) <= thresh * masked_area:  # always enters once, reduce erosion iters until eroded mask is big enough
+    while (
+        np.sum(eroded) <= thresh * masked_area
+    ):  # always enters once, reduce erosion iters until eroded mask is big enough
         eroded = positive_erode(mask, erode_iters=erode_iters)
         erode_iters = erode_iters // 2
     assert thresh * masked_area < eroded.sum(), "Too much erosion!"
     return eroded
 
-def safe_dilate(mask:np.ndarray, dilate_iters:int, thresh:float=1.3) -> np.ndarray:
+
+def safe_dilate(
+    mask: np.ndarray, dilate_iters: int, thresh: float = 1.3
+) -> np.ndarray:
     """Dilate but maintaining an area inferior to thresh times the original area"""
     masked_area = mask.sum()
     dilated = thresh * masked_area + 1  # init as number
@@ -81,17 +100,22 @@ def safe_dilate(mask:np.ndarray, dilate_iters:int, thresh:float=1.3) -> np.ndarr
     assert dilated.sum() < thresh * masked_area, "Too much dilation!"
     return dilated
 
-def get_outside_border_mask(mask: np.ndarray, dilate_iters:int=15, safe_thresh:Union[None, float]=1.3) -> Tuple(np.ndarray, bool):
+
+def get_outside_border_mask(
+    mask: np.ndarray,
+    dilate_iters: int = 15,
+    safe_thresh: Union[None, float] = 1.3,
+) -> Tuple(np.ndarray, bool):
     """Get border part lying outside mask"""
     if safe_thresh:
-        expanded_mask = safe_dilate(mask, dilate_iters=dilate_iters, thresh=safe_thresh)
+        expanded_mask = safe_dilate(
+            mask, dilate_iters=dilate_iters, thresh=safe_thresh
+        )
     else:
         expanded_mask = positive_dilate(mask, dilate_iters=dilate_iters)
     no_border = np.all(expanded_mask == mask)  # true if there is no border
     expanded_mask[mask.astype(bool)] = 0  # delet contents inside mask
     return 1 * expanded_mask, no_border
-
-
 
 
 # def get_negative_click(mask, near_border=False, uniform_probs=False, dilate_iters=15):

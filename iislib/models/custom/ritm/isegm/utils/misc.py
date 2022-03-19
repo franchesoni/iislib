@@ -1,5 +1,5 @@
-import torch
 import numpy as np
+import torch
 
 from .log import logger
 
@@ -12,25 +12,29 @@ def get_dims_with_exclusion(dim, exclude=None):
     return dims
 
 
-def save_checkpoint(net, checkpoints_path, epoch=None, prefix='', verbose=True, multi_gpu=False):
+def save_checkpoint(
+    net, checkpoints_path, epoch=None, prefix="", verbose=True, multi_gpu=False
+):
     if epoch is None:
-        checkpoint_name = 'last_checkpoint.pth'
+        checkpoint_name = "last_checkpoint.pth"
     else:
-        checkpoint_name = f'{epoch:03d}.pth'
+        checkpoint_name = f"{epoch:03d}.pth"
 
     if prefix:
-        checkpoint_name = f'{prefix}_{checkpoint_name}'
+        checkpoint_name = f"{prefix}_{checkpoint_name}"
 
     if not checkpoints_path.exists():
         checkpoints_path.mkdir(parents=True)
 
     checkpoint_path = checkpoints_path / checkpoint_name
     if verbose:
-        logger.info(f'Save checkpoint to {str(checkpoint_path)}')
+        logger.info(f"Save checkpoint to {str(checkpoint_path)}")
 
     net = net.module if multi_gpu else net
-    torch.save({'state_dict': net.state_dict(),
-                'config': net._config}, str(checkpoint_path))
+    torch.save(
+        {"state_dict": net.state_dict(), "config": net._config},
+        str(checkpoint_path),
+    )
 
 
 def get_bbox_from_mask(mask):
@@ -61,8 +65,12 @@ def expand_bbox(bbox, expand_ratio, min_crop_size=None):
 
 
 def clamp_bbox(bbox, rmin, rmax, cmin, cmax):
-    return (max(rmin, bbox[0]), min(rmax, bbox[1]),
-            max(cmin, bbox[2]), min(cmax, bbox[3]))
+    return (
+        max(rmin, bbox[0]),
+        min(rmax, bbox[1]),
+        max(cmin, bbox[2]),
+        min(cmax, bbox[3]),
+    )
 
 
 def get_bbox_iou(b1, b2):

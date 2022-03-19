@@ -22,7 +22,7 @@ In practice an annotation is a set of positive/negative clicks and there
 are auxiliary variables that are used and transformed by the model. An
 IIS model :math:`f` is then
 
-.. math:: \hat{y}_{k+1}, z_{k+1} = f(x, z_k, [c_1, \dots, c_k]) 
+.. math:: \hat{y}_{k+1}, z_{k+1} = f(x, z_k, [c_1, \dots, c_k])
 
 where :math:`x` is the input image, :math:`z` is an auxiliary variable
 (e.g. :math:`z_k = \hat{y}_k`), and :math:`c_k` are the clicks made at
@@ -42,7 +42,7 @@ The *pseudocode* for a full inference is the following
        for k in [1, ..., K]:
            clicks_k = oracle(y, target, click_seq)  # annotate
            click_seq.append(clicks_k)
-           y, z = model(image, z, click_seq)  # predict 
+           y, z = model(image, z, click_seq)  # predict
        return y
 
 Structure
@@ -166,4 +166,3 @@ Notes
    ``self.net(image_nd, points_nd)['instances']``. The other classes are
    children of this one, so the model is called in the same way (some
    other optimizations may be done).
-

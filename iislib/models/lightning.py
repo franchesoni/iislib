@@ -1,6 +1,5 @@
-import torch
 import pytorch_lightning as pl
-
+import torch
 from engine.training_logic import interact
 
 
@@ -19,7 +18,9 @@ class LitIIS(pl.LightningModule):
     ):
         super().__init__()
         self.save_hyperparameters()
-        self.model = iis_model_cls(*iis_model_args_list, **iis_model_kwargs_dict)
+        self.model = iis_model_cls(
+            *iis_model_args_list, **iis_model_kwargs_dict
+        )
         self.loss_fn = loss_fn
         self.robot_click = robot_click
         self.training_metrics = training_metrics
@@ -42,14 +43,18 @@ class LitIIS(pl.LightningModule):
             self.interaction_steps,
             max_interactions=None,
             clicks_per_step=2,
-            batch_idx=batch_idx
+            batch_idx=batch_idx,
         )
         target = batch["mask"]
         breakpoint()
-        loss = self.loss_fn(y.squeeze(), target.squeeze())  # get dimensions right
+        loss = self.loss_fn(
+            y.squeeze(), target.squeeze()
+        )  # get dimensions right
         self.log("train_loss", loss)
         for metric_name in self.training_metrics:
-            self.log(metric_name, self.training_metrics[metric_name](output, target))
+            self.log(
+                metric_name, self.training_metrics[metric_name](output, target)
+            )
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -62,17 +67,20 @@ class LitIIS(pl.LightningModule):
             self.interaction_steps,
             max_interactions=None,
             clicks_per_step=2,
-            batch_idx=batch_idx
+            batch_idx=batch_idx,
         )
         target = batch["mask"]
         breakpoint()
-        loss = self.loss_fn(y.squeeze(), target.squeeze())  # get dimensions right
+        loss = self.loss_fn(
+            y.squeeze(), target.squeeze()
+        )  # get dimensions right
         self.log("val_loss", loss)
         for metric_name in self.validation_metrics:
-            self.log(metric_name, self.validation_metrics[metric_name](output, target))
+            self.log(
+                metric_name,
+                self.validation_metrics[metric_name](output, target),
+            )
         return loss
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
-
-

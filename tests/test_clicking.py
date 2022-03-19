@@ -1,7 +1,6 @@
-
 def encode__disk_mask_from_coords():
-    from clicking.encode import disk_mask_from_coords
     import matplotlib.pyplot as plt
+    from clicking.encode import disk_mask_from_coords
 
     points = [(130, 120), (200, 20)]
     out_shape = (256, 256)

@@ -1,6 +1,6 @@
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
 
 
 class Initializer(object):
@@ -9,24 +9,37 @@ class Initializer(object):
         self.gamma = gamma
 
     def __call__(self, m):
-        if getattr(m, '__initialized', False):
+        if getattr(m, "__initialized", False):
             return
 
-        if isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d,
-                          nn.InstanceNorm1d, nn.InstanceNorm2d, nn.InstanceNorm3d,
-                          nn.GroupNorm, nn.SyncBatchNorm)) or 'BatchNorm' in m.__class__.__name__:
+        if (
+            isinstance(
+                m,
+                (
+                    nn.BatchNorm1d,
+                    nn.BatchNorm2d,
+                    nn.BatchNorm3d,
+                    nn.InstanceNorm1d,
+                    nn.InstanceNorm2d,
+                    nn.InstanceNorm3d,
+                    nn.GroupNorm,
+                    nn.SyncBatchNorm,
+                ),
+            )
+            or "BatchNorm" in m.__class__.__name__
+        ):
             if m.weight is not None:
                 self._init_gamma(m.weight.data)
             if m.bias is not None:
                 self._init_beta(m.bias.data)
         else:
-            if getattr(m, 'weight', None) is not None:
+            if getattr(m, "weight", None) is not None:
                 self._init_weight(m.weight.data)
-            if getattr(m, 'bias', None) is not None:
+            if getattr(m, "bias", None) is not None:
                 self._init_bias(m.bias.data)
 
         if self.local_init:
-            object.__setattr__(m, '__initialized', True)
+            object.__setattr__(m, "__initialized", True)
 
     def _init_weight(self, data):
         nn.init.uniform_(data, -0.07, 0.07)
@@ -71,13 +84,17 @@ class Bilinear(Initializer):
         center = scale - 0.5 * (1 + kernel_size % 2)
 
         og = np.ogrid[:kernel_size, :kernel_size]
-        kernel = (1 - np.abs(og[0] - center) / scale) * (1 - np.abs(og[1] - center) / scale)
+        kernel = (1 - np.abs(og[0] - center) / scale) * (
+            1 - np.abs(og[1] - center) / scale
+        )
 
         return torch.tensor(kernel, dtype=torch.float32)
 
 
 class XavierGluon(Initializer):
-    def __init__(self, rnd_type='uniform', factor_type='avg', magnitude=3, **kwargs):
+    def __init__(
+        self, rnd_type="uniform", factor_type="avg", magnitude=3, **kwargs
+    ):
         super().__init__(**kwargs)
 
         self.rnd_type = rnd_type
@@ -87,19 +104,19 @@ class XavierGluon(Initializer):
     def _init_weight(self, arr):
         fan_in, fan_out = nn.init._calculate_fan_in_and_fan_out(arr)
 
-        if self.factor_type == 'avg':
+        if self.factor_type == "avg":
             factor = (fan_in + fan_out) / 2.0
-        elif self.factor_type == 'in':
+        elif self.factor_type == "in":
             factor = fan_in
-        elif self.factor_type == 'out':
+        elif self.factor_type == "out":
             factor = fan_out
         else:
-            raise ValueError('Incorrect factor type')
+            raise ValueError("Incorrect factor type")
         scale = np.sqrt(self.magnitude / factor)
 
-        if self.rnd_type == 'uniform':
+        if self.rnd_type == "uniform":
             nn.init.uniform_(arr, -scale, scale)
-        elif self.rnd_type == 'gaussian':
+        elif self.rnd_type == "gaussian":
             nn.init.normal_(arr, 0, scale)
         else:
-            raise ValueError('Unknown random type')
+            raise ValueError("Unknown random type")

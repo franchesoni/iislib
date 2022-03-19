@@ -1,4 +1,4 @@
-## Reviving Iterative Training with Mask Guidance for Interactive Segmentation 
+## Reviving Iterative Training with Mask Guidance for Interactive Segmentation
 
 <p align="center">
     <a href="https://paperswithcode.com/sota/interactive-segmentation-on-grabcut?p=reviving-iterative-training-with-mask">
@@ -33,29 +33,29 @@ This repository provides the source code for training and testing state-of-the-a
 > Samsung AI Center Moscow <br>
 > https://arxiv.org/abs/2102.06583
 >
-> **Abstract:** *Recent works on click-based interactive segmentation have demonstrated state-of-the-art results by 
-> using various inference-time optimization schemes. These methods are considerably more computationally expensive 
-> compared to feedforward approaches, as they require performing backward passes through a network during inference and 
-> are hard to deploy on mobile frameworks that usually support only forward passes. In this paper, we extensively 
-> evaluate various design choices for interactive segmentation and discover that new state-of-the-art results can be 
-> obtained without any additional optimization schemes. Thus, we propose a simple feedforward model for click-based 
-> interactive segmentation that employs the segmentation masks from previous steps. It allows not only to segment an 
+> **Abstract:** *Recent works on click-based interactive segmentation have demonstrated state-of-the-art results by
+> using various inference-time optimization schemes. These methods are considerably more computationally expensive
+> compared to feedforward approaches, as they require performing backward passes through a network during inference and
+> are hard to deploy on mobile frameworks that usually support only forward passes. In this paper, we extensively
+> evaluate various design choices for interactive segmentation and discover that new state-of-the-art results can be
+> obtained without any additional optimization schemes. Thus, we propose a simple feedforward model for click-based
+> interactive segmentation that employs the segmentation masks from previous steps. It allows not only to segment an
 > entirely new object, but also to start with an external mask and correct it. When analyzing the performance of models
-> trained on different datasets, we observe that the choice of a training dataset greatly impacts the quality of 
-> interactive segmentation. We find that the models trained on a combination of COCO and LVIS with diverse and 
+> trained on different datasets, we observe that the choice of a training dataset greatly impacts the quality of
+> interactive segmentation. We find that the models trained on a combination of COCO and LVIS with diverse and
 > high-quality annotations show performance superior to all existing models.*
 
 
 ## Setting up an environment
 
-This framework is built using Python 3.6 and relies on the PyTorch 1.4.0+. The following command installs all 
+This framework is built using Python 3.6 and relies on the PyTorch 1.4.0+. The following command installs all
 necessary packages:
 
 ```.bash
 pip3 install -r requirements.txt
 ```
 
-You can also use our [Dockerfile](./Dockerfile) to build a container with the configured environment. 
+You can also use our [Dockerfile](./Dockerfile) to build a container with the configured environment.
 
 If you want to run training or testing, you must configure the paths to the datasets in [config.yml](config.yml).
 
@@ -65,8 +65,8 @@ If you want to run training or testing, you must configure the paths to the data
   <img src="./assets/img/demo_gui.jpg" alt="drawing" width="99%"/>
 </p>
 
-The GUI is based on TkInter library and its Python bindings. You can try our interactive demo with any of the 
-[provided models](#pretrained-models). Our scripts automatically detect the architecture of the loaded model, just 
+The GUI is based on TkInter library and its Python bindings. You can try our interactive demo with any of the
+[provided models](#pretrained-models). Our scripts automatically detect the architecture of the loaded model, just
 specify the path to the corresponding checkpoint.
 
 Examples of the script usage:
@@ -110,7 +110,7 @@ docker run -v "$PWD":/tmp/ \
 <p align="center">
   <img src="./assets/img/modifying_external_mask.jpg" alt="drawing" width="80%"/>
 </p>
-  
+
 According to our paper, ITER-M models take an image, encoded user input, and a previous step mask as their input. Moreover, a user can initialize the model with an external mask before placing any clicks and correct this mask using the same interface.  As it turns out, our models successfully handle this situation and make it possible to change the mask.
 
 
@@ -130,11 +130,11 @@ To initialize any ITER-M model with an external mask use the "Load mask" button 
     <li>BRS parameters (BRS type can be changed using the dropdown menu)</li>
     <ul>
         <li><i>Network clicks</i> - the number of first clicks that are included in the network's input. Subsequent clicks are processed only using BRS  (NoBRS ignores this option).</li>
-        <li><i>L-BFGS-B max iterations</i> - the maximum number of function evaluation for each step of optimization in BRS (increase for better accuracy and longer computational time for each click).</li>  
+        <li><i>L-BFGS-B max iterations</i> - the maximum number of function evaluation for each step of optimization in BRS (increase for better accuracy and longer computational time for each click).</li>
     </ul>
     <li>Visualisation parameters</li>
     <ul>
-        <li><i>Prediction threshold</i> slider adjusts the threshold for binarization of probability map for the current object.</li> 
+        <li><i>Prediction threshold</i> slider adjusts the threshold for binarization of probability map for the current object.</li>
         <li><i>Alpha blending coefficient</i> slider adjusts the intensity of all predicted masks.</li>
         <li><i>Visualisation click radius</i> slider adjusts the size of red and green dots depicting clicks.</li>
     </ul>
@@ -173,7 +173,7 @@ We train all our models on SBD and COCO+LVIS and evaluate them on GrabCut, Berke
 
 Don't forget to change the paths to the datasets in [config.yml](config.yml) after downloading and unpacking.
 
-(*) To prepare COCO+LVIS, you need to download original LVIS v1.0, then download and unpack our 
+(*) To prepare COCO+LVIS, you need to download original LVIS v1.0, then download and unpack our
 pre-processed annotations that are obtained by combining COCO and LVIS dataset into the folder with LVIS v1.0.
 
 ## Testing
@@ -190,7 +190,7 @@ You can find model weights and evaluation results in the tables below:
             <th rowspan="2">Model</th>
             <th colspan="2">GrabCut</th>
             <th>Berkeley</th>
-            <th colspan="2">SBD</th>    
+            <th colspan="2">SBD</th>
             <th colspan="2">DAVIS</th>
             <th>Pascal<br>VOC</th>
             <th>COCO<br>MVal</th>
@@ -276,9 +276,9 @@ You can find model weights and evaluation results in the tables below:
 
 ### Evaluation
 
-We provide the script to test all the presented models in all possible configurations on GrabCut, Berkeley, DAVIS, 
-Pascal VOC, and SBD. To test a model, you should download its weights and put them in `./weights` folder (you can 
-change this path in the [config.yml](config.yml), see `INTERACTIVE_MODELS_PATH` variable). To test any of our models, 
+We provide the script to test all the presented models in all possible configurations on GrabCut, Berkeley, DAVIS,
+Pascal VOC, and SBD. To test a model, you should download its weights and put them in `./weights` folder (you can
+change this path in the [config.yml](config.yml), see `INTERACTIVE_MODELS_PATH` variable). To test any of our models,
 just specify the path to the corresponding checkpoint. Our scripts automatically detect the architecture of the loaded model.
 
 The following command runs the NoC evaluation on all test datasets (other options are displayed using '-h'):
@@ -320,21 +320,21 @@ python3 train.py models/iter_mask/hrnet18_cocolvis_itermask_3p.py --gpus=0,1 --w
 python3 train.py models/iter_mask/hrnet32_cocolvis_itermask_3p.py --gpus=0,1,2,3 --workers=12 --exp-name=first-try
 ```
 
-For each experiment, a separate folder is created in the `./experiments` with Tensorboard logs, text logs, 
-visualization and checkpoints. You can specify another path in the [config.yml](config.yml) (see `EXPS_PATH` 
+For each experiment, a separate folder is created in the `./experiments` with Tensorboard logs, text logs,
+visualization and checkpoints. You can specify another path in the [config.yml](config.yml) (see `EXPS_PATH`
 variable).
 
-Please note that we trained ResNet-34 and HRNet-18s on 1 GPU, HRNet-18 on 2 GPUs, HRNet-32 on 4 GPUs 
+Please note that we trained ResNet-34 and HRNet-18s on 1 GPU, HRNet-18 on 2 GPUs, HRNet-32 on 4 GPUs
 (we used Nvidia Tesla P40 for training). To train on a different GPU you should adjust the batch size using the command
 line argument `--batch-size` or change the default value in a model script.
 
-We used the pre-trained HRNetV2 models from [the official repository](https://github.com/HRNet/HRNet-Image-Classification). 
-If you want to train interactive segmentation with these models, you need to download the weights and specify the paths to 
+We used the pre-trained HRNetV2 models from [the official repository](https://github.com/HRNet/HRNet-Image-Classification).
+If you want to train interactive segmentation with these models, you need to download the weights and specify the paths to
 them in [config.yml](config.yml).
 
 ## License
 
-The code is released under the MIT License. It is a short, permissive software license. Basically, you can do whatever you want as long as you include the original copyright and license notice in any copy of the software/source. 
+The code is released under the MIT License. It is a short, permissive software license. Basically, you can do whatever you want as long as you include the original copyright and license notice in any copy of the software/source.
 ## Citation
 
 If you find this work is useful for your research, please cite our papers:

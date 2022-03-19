@@ -1,0 +1,16 @@
+albumentations
+Cython
+easydict
+guided_filter_pytorch
+matplotlib
+numpy
+opencv_python_headless
+Pillow
+pytorch_lightning
+PyYAML
+scikit_image
+scipy
+segmentation_models_pytorch
+torch
+torchvision
+tqdm

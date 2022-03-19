@@ -1,5 +1,7 @@
 from code import interact
+
 import torch
+
 
 def interact(
     model,
@@ -13,7 +15,9 @@ def interact(
     batch_idx=None,
 ):
     if interaction_steps is None:
-        assert max_interactions, "This should be an int if `interaction_steps` is None"
+        assert (
+            max_interactions
+        ), "This should be an int if `interaction_steps` is None"
         interaction_steps_m1 = torch.randint(
             max_interactions, (1,)
         )  # we don't add 1 because that 1 is the step in which gradients are computed (outside the for loop)
@@ -23,8 +27,12 @@ def interact(
         batch["mask"],
     )
 
-    assert image.shape[1] == 3, f"Image should be (B, 3, H, W) but is {image.shape}"
-    assert target.shape[1] == 1, f"Target should be (B, 1, H, W) but is {target.shape}"
+    assert (
+        image.shape[1] == 3
+    ), f"Image should be (B, 3, H, W) but is {image.shape}"
+    assert (
+        target.shape[1] == 1
+    ), f"Target should be (B, 1, H, W) but is {target.shape}"
     z = init_z(image, target)
     y = init_y(image, target)
     pcs, ncs = [], []
@@ -36,7 +44,9 @@ def interact(
             )
             y, z = model(image, z, pcs, ncs)
     # last interaction with gradient computation
-    pcs, ncs = robot_click(y, target, n_points=clicks_per_step, pcs=pcs, ncs=ncs)
+    pcs, ncs = robot_click(
+        y, target, n_points=clicks_per_step, pcs=pcs, ncs=ncs
+    )
     y, z = model(image, z, pcs, ncs)
     return y, z, pcs, ncs
 

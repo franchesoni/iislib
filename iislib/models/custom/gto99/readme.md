@@ -1,10 +1,10 @@
 # Deep Interactive Segmentation
 
 Official repository for the two papers.
-> [**Getting to 99% Accuracy in Interactive Segmentation**](https://arxiv.org/abs/2003.07932), submitted to Signal Processing: Image Communication the Special Issue on Computational Image Editing. 
+> [**Getting to 99% Accuracy in Interactive Segmentation**](https://arxiv.org/abs/2003.07932), submitted to Signal Processing: Image Communication the Special Issue on Computational Image Editing.
 
-> **Interactive Training and Architecture for Deep Object Selection**, (Runner-up Best Paper) ICME 2020.  
-Marco Forte<sup>1</sup>, Brian Price<sup>2</sup>, Scott Cohen<sup>2</sup>, Ning Xu<sup>2</sup>, [François Pitié](https://francois.pitie.net/)<sup>1</sup>   
+> **Interactive Training and Architecture for Deep Object Selection**, (Runner-up Best Paper) ICME 2020.
+Marco Forte<sup>1</sup>, Brian Price<sup>2</sup>, Scott Cohen<sup>2</sup>, Ning Xu<sup>2</sup>, [François Pitié](https://francois.pitie.net/)<sup>1</sup>
 <sup>1</sup> Trinity College Dublin
 <sup>2</sup> Adobe Research
 
@@ -27,7 +27,7 @@ GPU memory >= 4GB for inference on Berkeley and GrabCut. Optimal performance aro
 | [SyntheticPretrained+Finetune on SBD](https://drive.google.com/file/d/1nJMTXSlprm5FQaQA5gfyU8CbSEX8ghzJ/view?usp=sharing)  | 144mb | 1.74 | 2.93  |
 
 
-## Prediction 
+## Prediction
 We provide a script `demo.py` which evaluates our model in terms of mean IoU and number of clicks to reach 90% accuracy. Links to download: the [GrabCut](https://drive.google.com/open?id=1FFBH4vArby8alggT0SKjXPW7F8ShjXTp) and [Berkeley](https://drive.google.com/open?id=1atKWE4IY4FKFaNHsn-l7kbEo8T2z3MPx) datasets. Results are slightly improved from Table. 8 in the paper, this is due to changes in prediction, the weights are the same as used in the paper.
 
 

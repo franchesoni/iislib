@@ -136,7 +136,7 @@ class EvaluationDataset(RegionDataset):
 
 # modify DataLoader so that we can get a variable dict in the third output
 np_str_obj_array_pattern = re.compile(r"[SaUO]")
-default_collate_err_msg_format = (
+DEFAULT_COLLATE_ERR_MSG_FORMAT = (
     "default_collate: batch must contain tensors, numpy arrays, numbers, "
     "dicts or lists; found {}"
 )
@@ -167,9 +167,8 @@ def my_collate_subfn(batch):
             # array of string classes and object
             if np_str_obj_array_pattern.search(elem.dtype.str) is not None:
                 raise TypeError(
-                    default_collate_err_msg_format.format(elem.dtype)
+                    DEFAULT_COLLATE_ERR_MSG_FORMAT.format(elem.dtype)
                 )
-
             return my_collate_subfn([torch.as_tensor(b) for b in batch])
         if elem.shape == ():  # scalars
             return torch.as_tensor(batch)
@@ -194,7 +193,7 @@ def my_collate_subfn(batch):
         transposed = zip(*batch)
         return [my_collate_subfn(samples) for samples in transposed]
 
-    raise TypeError(default_collate_err_msg_format.format(elem_type))
+    raise TypeError(DEFAULT_COLLATE_ERR_MSG_FORMAT.format(elem_type))
 
 
 def my_collate_fn(batch):

@@ -1,21 +1,25 @@
 from contextlib import ExitStack
 
 import torch
-from torch import nn
 import torch.nn.functional as F
+from models.custom.ritm.isegm.model import ops
+from torch import nn
 
 from .basic_blocks import SeparableConv2d
 from .resnet import ResNetBackbone
-from models.custom.ritm.isegm.model import ops
 
 
 class DeepLabV3Plus(nn.Module):
-    def __init__(self, backbone='resnet50', norm_layer=nn.BatchNorm2d,
-                 backbone_norm_layer=None,
-                 ch=256,
-                 project_dropout=0.5,
-                 inference_mode=False,
-                 **kwargs):
+    def __init__(
+        self,
+        backbone="resnet50",
+        norm_layer=nn.BatchNorm2d,
+        backbone_norm_layer=None,
+        ch=256,
+        project_dropout=0.5,
+        inference_mode=False,
+        **kwargs,
+    ):
         super(DeepLabV3Plus, self).__init__()
         if backbone_norm_layer is None:
             backbone_norm_layer = norm_layer
@@ -29,28 +33,44 @@ class DeepLabV3Plus(nn.Module):
         self.skip_project_in_channels = 256  # layer 1 out_channels
 
         self._kwargs = kwargs
-        if backbone == 'resnet34':
+        if backbone == "resnet34":
             self.aspp_in_channels = 512
             self.skip_project_in_channels = 64
 
-        self.backbone = ResNetBackbone(backbone=self.backbone_name, pretrained_base=False,
-                                       norm_layer=self.backbone_norm_layer, **kwargs)
+        self.backbone = ResNetBackbone(
+            backbone=self.backbone_name,
+            pretrained_base=False,
+            norm_layer=self.backbone_norm_layer,
+            **kwargs,
+        )
 
-        self.head = _DeepLabHead(in_channels=ch + 32, mid_channels=ch, out_channels=ch,
-                                 norm_layer=self.norm_layer)
-        self.skip_project = _SkipProject(self.skip_project_in_channels, 32, norm_layer=self.norm_layer)
-        self.aspp = _ASPP(in_channels=self.aspp_in_channels,
-                          atrous_rates=[12, 24, 36],
-                          out_channels=ch,
-                          project_dropout=project_dropout,
-                          norm_layer=self.norm_layer)
+        self.head = _DeepLabHead(
+            in_channels=ch + 32,
+            mid_channels=ch,
+            out_channels=ch,
+            norm_layer=self.norm_layer,
+        )
+        self.skip_project = _SkipProject(
+            self.skip_project_in_channels, 32, norm_layer=self.norm_layer
+        )
+        self.aspp = _ASPP(
+            in_channels=self.aspp_in_channels,
+            atrous_rates=[12, 24, 36],
+            out_channels=ch,
+            project_dropout=project_dropout,
+            norm_layer=self.norm_layer,
+        )
 
         if inference_mode:
             self.set_prediction_mode()
 
     def load_pretrained_weights(self):
-        pretrained = ResNetBackbone(backbone=self.backbone_name, pretrained_base=True,
-                                    norm_layer=self.backbone_norm_layer, **self._kwargs)
+        pretrained = ResNetBackbone(
+            backbone=self.backbone_name,
+            pretrained_base=True,
+            norm_layer=self.backbone_norm_layer,
+            **self._kwargs,
+        )
         backbone_state_dict = self.backbone.state_dict()
         pretrained_state_dict = pretrained.state_dict()
 
@@ -74,11 +94,13 @@ class DeepLabV3Plus(nn.Module):
             c1 = self.skip_project(c1)
 
             x = self.aspp(c4)
-            x = F.interpolate(x, c1.size()[2:], mode='bilinear', align_corners=True)
+            x = F.interpolate(
+                x, c1.size()[2:], mode="bilinear", align_corners=True
+            )
             x = torch.cat((x, c1), dim=1)
             x = self.head(x)
 
-        return x,
+        return (x,)
 
 
 class _SkipProject(nn.Module):
@@ -89,7 +111,7 @@ class _SkipProject(nn.Module):
         self.skip_project = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
             norm_layer(out_channels),
-            _activation()
+            _activation(),
         )
 
     def forward(self, x):
@@ -97,15 +119,37 @@ class _SkipProject(nn.Module):
 
 
 class _DeepLabHead(nn.Module):
-    def __init__(self, out_channels, in_channels, mid_channels=256, norm_layer=nn.BatchNorm2d):
+    def __init__(
+        self,
+        out_channels,
+        in_channels,
+        mid_channels=256,
+        norm_layer=nn.BatchNorm2d,
+    ):
         super(_DeepLabHead, self).__init__()
 
         self.block = nn.Sequential(
-            SeparableConv2d(in_channels=in_channels, out_channels=mid_channels, dw_kernel=3,
-                            dw_padding=1, activation='relu', norm_layer=norm_layer),
-            SeparableConv2d(in_channels=mid_channels, out_channels=mid_channels, dw_kernel=3,
-                            dw_padding=1, activation='relu', norm_layer=norm_layer),
-            nn.Conv2d(in_channels=mid_channels, out_channels=out_channels, kernel_size=1)
+            SeparableConv2d(
+                in_channels=in_channels,
+                out_channels=mid_channels,
+                dw_kernel=3,
+                dw_padding=1,
+                activation="relu",
+                norm_layer=norm_layer,
+            ),
+            SeparableConv2d(
+                in_channels=mid_channels,
+                out_channels=mid_channels,
+                dw_kernel=3,
+                dw_padding=1,
+                activation="relu",
+                norm_layer=norm_layer,
+            ),
+            nn.Conv2d(
+                in_channels=mid_channels,
+                out_channels=out_channels,
+                kernel_size=1,
+            ),
         )
 
     def forward(self, x):
@@ -113,14 +157,25 @@ class _DeepLabHead(nn.Module):
 
 
 class _ASPP(nn.Module):
-    def __init__(self, in_channels, atrous_rates, out_channels=256,
-                 project_dropout=0.5, norm_layer=nn.BatchNorm2d):
+    def __init__(
+        self,
+        in_channels,
+        atrous_rates,
+        out_channels=256,
+        project_dropout=0.5,
+        norm_layer=nn.BatchNorm2d,
+    ):
         super(_ASPP, self).__init__()
 
         b0 = nn.Sequential(
-            nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, bias=False),
+            nn.Conv2d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=1,
+                bias=False,
+            ),
             norm_layer(out_channels),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
         rate1, rate2, rate3 = tuple(atrous_rates)
@@ -132,10 +187,14 @@ class _ASPP(nn.Module):
         self.concurent = nn.ModuleList([b0, b1, b2, b3, b4])
 
         project = [
-            nn.Conv2d(in_channels=5*out_channels, out_channels=out_channels,
-                      kernel_size=1, bias=False),
+            nn.Conv2d(
+                in_channels=5 * out_channels,
+                out_channels=out_channels,
+                kernel_size=1,
+                bias=False,
+            ),
             norm_layer(out_channels),
-            nn.ReLU()
+            nn.ReLU(),
         ]
         if project_dropout > 0:
             project.append(nn.Dropout(project_dropout))
@@ -153,24 +212,35 @@ class _AsppPooling(nn.Module):
 
         self.gap = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
-                      kernel_size=1, bias=False),
+            nn.Conv2d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=1,
+                bias=False,
+            ),
             norm_layer(out_channels),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
     def forward(self, x):
         pool = self.gap(x)
-        return F.interpolate(pool, x.size()[2:], mode='bilinear', align_corners=True)
+        return F.interpolate(
+            pool, x.size()[2:], mode="bilinear", align_corners=True
+        )
 
 
 def _ASPPConv(in_channels, out_channels, atrous_rate, norm_layer):
     block = nn.Sequential(
-        nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
-                  kernel_size=3, padding=atrous_rate,
-                  dilation=atrous_rate, bias=False),
+        nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=3,
+            padding=atrous_rate,
+            dilation=atrous_rate,
+            bias=False,
+        ),
         norm_layer(out_channels),
-        nn.ReLU()
+        nn.ReLU(),
     )
 
     return block
