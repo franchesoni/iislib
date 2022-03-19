@@ -1,5 +1,6 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
+exclude: '\/[^,:]*\/(ritm|gto99)\/'
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.1.0
@@ -12,12 +13,16 @@ repos:
     rev: v2.31.1
     hooks:
     -   id: pyupgrade
--   repo: https://github.com/pycqa/isort
-    rev: 5.10.1
+-   repo: https://github.com/asottile/reorder_python_imports
+    rev: v3.0.1
     hooks:
-      - id: isort
-        args: ["--profile", "black"]
-        name: isort (python)
+    -   id: reorder-python-imports
+# -   repo: https://github.com/pycqa/isort
+#     rev: 5.10.1
+#     hooks:
+#       - id: isort
+#         args: ["--profile", "black"]
+#         name: isort (python)
 -   repo: https://github.com/psf/black
     rev: 22.1.0
     hooks:
@@ -37,6 +42,8 @@ repos:
     rev: '4.0.1'  # pick a git hash / tag to point to
     hooks:
     -   id: flake8
+        args:
+            - --extend-ignore=E203
 -   repo: https://github.com/PyCQA/prospector
     rev: 1.7.7
     hooks:
@@ -44,4 +51,5 @@ repos:
         additional_dependencies:
         - ".[with_everything]"
         args:
-        - -s=veryhigh
+        - -s=medium
+        - --profile=prospector_profile.yaml

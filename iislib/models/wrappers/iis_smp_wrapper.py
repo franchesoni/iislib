@@ -1,9 +1,7 @@
-from turtle import forward
-from typing import List, Union
+from typing import List
 
 import segmentation_models_pytorch as smp
 import torch
-from clicking.encode import disk_mask_from_coords_batch
 
 
 # useful for all smp models
@@ -19,7 +17,8 @@ class EarlySMP(torch.nn.Module, smp.encoders._base.EncoderMixin):
         super().__init__()
         assert (
             "encoder_weights" in smp_model_kwargs_dict
-        ), 'Sorry, default behavior is undefined. To use pretrained weights pass "imagenet" as "encoder_weights" value.'
+        ), 'Sorry, default behavior is undefined. To use pretrained weights\
+        pass "imagenet" as "encoder_weights" value.'
         self.click_encoder = click_encoder
         smp_model_kwargs_dict["in_channels"] = in_channels
         smp_model_kwargs_dict["classes"] = classes
@@ -37,7 +36,7 @@ class EarlySMP(torch.nn.Module, smp.encoders._base.EncoderMixin):
     # def forward(self, x, z, pcs, ncs):
     #     pc_mask = disk_mask_from_coords_batch(pos_clicks, prev_pc_mask)
 
-    def _forward(
+    def x_aux_forward(
         self, x: torch.Tensor, aux: torch.Tensor
     ) -> List[torch.Tensor]:
         x = (
@@ -64,9 +63,12 @@ class EncodeSMP(torch.nn.Module, smp.encoders._base.EncoderMixin):
         smp_model_classes=1,
     ):
         super().__init__()
-        assert smp_model_kwargs_dict.has_key(
-            "encoder_weights"
-        ), 'Sorry, default behavior is undefined. To use pretrained weights pass "imagenet" as "encoder_weights" value.'
+        assert (
+            "encoder_weights" in smp_model_kwargs_dict
+        ), 'Sorry, default\
+             behavior is undefined. To use pretrained weights pass\
+             "imagenet" as "encoder_weights" value.'
+        self.click_encoder = click_encoder
         smp_model_kwargs_dict["classes"] = smp_model_classes
         self.model = smp_model_class(**smp_model_kwargs_dict)
         self.model_preprocessing_fn = (
@@ -86,9 +88,9 @@ class EncodeSMP(torch.nn.Module, smp.encoders._base.EncoderMixin):
         )
 
     def forward(self, x, z, pcs, ncs):
-        pass
+        raise NotImplementedError
 
-    def _forward(
+    def x_aux_forward(
         self, x: torch.Tensor, aux: torch.Tensor
     ) -> List[torch.Tensor]:
         x = (

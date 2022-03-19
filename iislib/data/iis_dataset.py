@@ -1,7 +1,10 @@
 import collections
 import re
-from abc import ABC, abstractmethod
-from typing import Any, Callable, Union
+from abc import ABC
+from abc import abstractmethod
+from typing import Any
+from typing import Callable
+from typing import Union
 
 import numpy as np
 import torch
@@ -30,7 +33,7 @@ class SegDataset(torch.utils.data.Dataset, ABC):
 
     def check_sample(self):
         sample = self.get_sample(0)
-        image, masks, info = sample  # what a sampel should be
+        image, masks, info = sample  # what a sample should be
         assert (
             image.shape[2] == 3
         ), f"Image should be RGB with channels last but its shape is \
@@ -98,14 +101,6 @@ class RegionDataset(RegionDatasetWithInfoNoDict):
     This is the same output (without 'info' key) that when using
     `RegionDataloader` over `RegionDatasetWithInfo`
     """
-
-    # def __init__(
-    #     self,
-    #     seg_dataset: SegDataset,
-    #     region_selector: Callable,
-    #     augmentator: Union[Callable, None] = None,
-    # ):
-    #     super().__init__(seg_dataset, region_selector, augmentator)
 
     def __getitem__(self, index: int) -> dict[str, np.ndarray]:
         image, mask, info = super().__getitem__(index)

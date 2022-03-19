@@ -4,9 +4,12 @@ import cv2
 import numpy as np
 import torch
 from dataloader import AlphaTestDataset
-from interaction import jaccard, remove_non_fg_connected, robot_click
+from interaction import jaccard
+from interaction import remove_non_fg_connected
+from interaction import robot_click
 from networks.models import build_model
-from networks.transforms import groupnorm_normalise_image, trimap_transform
+from networks.transforms import groupnorm_normalise_image
+from networks.transforms import trimap_transform
 
 
 def NOCS(ious, thresh):

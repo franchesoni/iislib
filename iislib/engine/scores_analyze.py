@@ -3,8 +3,10 @@ import numpy as np
 
 
 def get_res_by_key(res):
-    """results originally in list (img_n) of list (interaction_n) of dicts with keys 'metric_name'
-    that are transfomed to {'metric_name':array of shape (img_n, interaction_n)}
+    """results originally in list (img_n) of list (interaction_n) of dicts
+    with keys 'metric_name'
+    that are transfomed to {'metric_name':array of shape
+    (img_n, interaction_n)}
     """
     res_by_key = {}
     for key in res[0][0]:

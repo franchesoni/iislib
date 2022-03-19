@@ -2,7 +2,10 @@ import os
 import pickle
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Callable, Tuple, Union
+from typing import Any
+from typing import Callable
+from typing import Tuple
+from typing import Union
 
 import cv2
 import numpy as np
@@ -14,7 +17,7 @@ def drop_from_first_if_not_in_second(
     blist: list,
     fn_a: Union[Callable, None] = None,
     fn_b: Union[Callable, None] = None,
-) -> Tuple(list, list):
+) -> Tuple[list, list]:
     """this works for sorted lists over which we apply fn_a and fn_b \
        (and remain sorted)"""
     assert isinstance(alist, list) and isinstance(blist, list)
@@ -115,7 +118,7 @@ class CocoLvisDataset(SegDataset):
         #     if i in removed_indices
         # ]
 
-    def get_sample(self, index: int) -> Tuple(np.ndarray, np.ndarray, Any):
+    def get_sample(self, index: int) -> Tuple[np.ndarray, np.ndarray, Any]:
         image_id, sample = self.dataset_samples[index]
         image_path = self._images_path / f"{image_id}.jpg"
 

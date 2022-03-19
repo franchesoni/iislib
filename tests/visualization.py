@@ -1,4 +1,8 @@
+import os
+from pathlib import Path
+
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def visualize_on_test(
@@ -117,4 +121,5 @@ def visualize(img, name):
     plt.close()
 
 
-norm_fn = lambda x: (x - x.min()) / (x.max() - x.min())
+def norm_fn(x):
+    return (x - x.min()) / (x.max() - x.min())

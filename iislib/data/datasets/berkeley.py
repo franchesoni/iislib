@@ -1,5 +1,7 @@
 from pathlib import Path
-from typing import Any, Tuple, Union
+from typing import Any
+from typing import Tuple
+from typing import Union
 
 import cv2
 import numpy as np

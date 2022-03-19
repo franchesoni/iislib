@@ -1,5 +1,7 @@
 import torch
 
+from .visualization import visualize
+
 
 def test_data__iis_dataset():
     import pytorch_lightning as pl
@@ -21,17 +23,15 @@ def test_data__iis_dataset():
     )
     for ind, batch in enumerate(iis_dataloader):
         print(ind)
-        images, masks, infos = (batch["image"], batch["mask"], batch["info"])
+        images, masks = batch["image"], batch["mask"]
         visualize(images[0], "image")
         visualize(masks[0], "mask")
         breakpoint()
 
 
-from .visualization import visualize
-
-
 def test_data__datasets__coco_lvis():
     from data.datasets.coco_lvis import CocoLvisDataset
+    import numpy as np
 
     dataset = CocoLvisDataset(
         "/home/franchesoni/adisk/iis_datasets/datasets/LVIS"
@@ -51,9 +51,10 @@ def test_data__datasets__coco_lvis():
 
 def test_data__clicking():
     import pytorch_lightning as pl
+    import numpy as np
     from data.clicking import get_positive_clicks_batch, visualize_clicks
     from data.datasets.coco_lvis import CocoLvisDataset
-    from data.iis_dataset import RegionDataset, scin, visualize
+    from data.iis_dataset import RegionDataset
     from data.region_selector import random_single
     from data.transforms import RandomCrop
 

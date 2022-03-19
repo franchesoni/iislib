@@ -4,10 +4,8 @@ import torch
 from data.transforms import to_np
 from models.custom.gto99.interaction import remove_non_fg_connected
 from models.custom.gto99.networks.models import build_model
-from models.custom.gto99.networks.transforms import (
-    groupnorm_normalise_image,
-    trimap_transform,
-)
+from models.custom.gto99.networks.transforms import groupnorm_normalise_image
+from models.custom.gto99.networks.transforms import trimap_transform
 
 
 def scale_input(x: np.ndarray, scale_type) -> np.ndarray:

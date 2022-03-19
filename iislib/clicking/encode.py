@@ -1,25 +1,25 @@
-from typing import List, Tuple, Union
+from typing import Union
 
 import numpy as np
 import torch
 
-Point = Union[List[int], torch.Tensor]
+Point = Union[list[int], torch.Tensor]
 
 
-######### Disks ###############
+# Disks
 def np_simplest_disk(radius: int) -> np.ndarray:
-    """Creates a binary matrix containing a disk of the given radius using numpy"""
+    """Creates a binary matrix containing a disk of the given radius using
+    numpy"""
     out_side = radius * 2 + 1
-    out = np.zeros((out_side, out_side))
     rows, cols = np.mgrid[:out_side, :out_side]
     dist_to_center = np.sqrt((rows - radius) ** 2 + (cols - radius) ** 2)
     return 1 * (dist_to_center <= radius)
 
 
 def torch_simplest_disk(radius: int) -> torch.Tensor:
-    """Creates a binary matrix containing a disk of the given radius using torch"""
+    """Creates a binary matrix containing a disk of the given radius
+    using torch"""
     out_side = radius * 2 + 1
-    out = torch.zeros((out_side, out_side))
     rows, cols = torch.meshgrid([torch.arange(out_side)] * 2, indexing="ij")
     dist_to_center = torch.sqrt((rows - radius) ** 2 + (cols - radius) ** 2)
     return 1 * (dist_to_center <= radius)
@@ -30,7 +30,8 @@ def draw_disk_from_single_coords(
 ) -> torch.Tensor:
     """Adds disk of given `radius` centered in `point` to `initial_mask`
     `initial_mask` should be a binary ({0, 1}) matrix
-    `points` should be a `torch.Tensor` of size (2,) with (row_ind, col_ind)"""
+    `points` should be a `torch.Tensor` of size (2,) with
+    (row_ind, col_ind)"""
     assert len(initial_mask.shape) == 2, "`initial_mask` should be (H, W)"
     assert {int(e) for e in set(torch.unique(initial_mask))}.issubset(
         {0, 1}
@@ -46,7 +47,7 @@ def draw_disk_from_single_coords(
     out_mask[
         row_ind - radius + top_offset : row_ind + radius + 1 - bottom_offset,
         col_ind - radius + left_offset : col_ind + radius + 1 - right_offset,
-    ] = torch.logical_or(  # add disk in the correct position accounting for border clipping
+    ] = torch.logical_or(  # add disk in position considering border clipping
         out_mask[
             row_ind
             - radius
@@ -72,9 +73,10 @@ def draw_disk_from_single_coords(
 
 
 def disk_mask_from_coords(
-    points: List[Point], prev_mask: torch.Tensor, radius: int = 5
+    points: list[Point], prev_mask: torch.Tensor, radius: int = 5
 ) -> torch.Tensor:
-    """Adds disks of given `radius` centered in `points` list to `prev_mask`"""
+    """Adds disks of given `radius` centered in `points` list to
+    `prev_mask`"""
     out_mask = prev_mask.clone()
     for point in points:
         out_mask = draw_disk_from_single_coords(point, out_mask, radius=radius)
@@ -82,9 +84,10 @@ def disk_mask_from_coords(
 
 
 def disk_mask_from_coords_batch(
-    pointss: List[List[Point]], prev_masks: torch.Tensor, radius: int = 5
+    pointss: list[list[Point]], prev_masks: torch.Tensor, radius: int = 5
 ) -> torch.Tensor:
-    """Calls `disk_mask_from_coords` for each pair of `points` list and `prev_mask` in `zip(pointss, prev_masks)`"""
+    """Calls `disk_mask_from_coords` for each pair of `points` list and
+    `prev_mask` in `zip(pointss, prev_masks)`"""
     assert (
         len(pmshape := prev_masks.shape) == 4 and pmshape[1] == 1
     ), f"`prev_masks` should be (B, 1, H, W) but is {pmshape}"
@@ -102,17 +105,17 @@ def disk_mask_from_coords_batch(
 
 
 def encode_disks_last_clicks(
-    pcs: List[List[List[Point]]],
-    ncs: List[List[List[Point]]],
-    pos_encoding: List[torch.Tensor],
-    neg_encoding: List[torch.Tensor],
+    pcs: list[list[list[Point]]],
+    ncs: list[list[list[Point]]],
+    pos_encoding: list[torch.Tensor],
+    neg_encoding: list[torch.Tensor],
     radius: int = 5,
-) -> Tuple(List[torch.Tensor], List[torch.Tensor]):
+) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
     """
     `pcs` is a nested list indexed by (interaction, batch_element, click)
     `ncs` is a nested list indexed by (interaction, batch_element, click)
-    the last list inside `pcs` or `ncs` corresponds to the new click(s) to encode.
-    `pos_encoding`, `neg_encoding` are the previous encodings to be overwritten.
+    the last list inside `pcs` or `ncs` refers to the new click(s) to encode.
+    `pos_encoding`, `neg_encoding` are previous encodings to be overwritten.
     `last_xcs` will have nested dim : (batch_element, click)
     """
     last_pcs, last_ncs = pcs[-1], ncs[-1]
@@ -126,23 +129,23 @@ def encode_disks_last_clicks(
 
 
 def encode_disks_from_scratch(
-    pcs: List[List[List[Point]]],
-    ncs: List[List[List[Point]]],
-    pos_encoding: List[torch.Tensor],
-    neg_encoding: List[torch.Tensor],
+    pcs: list[list[list[Point]]],
+    ncs: list[list[list[Point]]],
+    pos_encoding: list[torch.Tensor],
+    neg_encoding: list[torch.Tensor],
     radius: int = 5,
-) -> Tuple(List[torch.Tensor], List[torch.Tensor]):
+) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
     """
     `pcs` is a nested list indexed by (interaction, batch_element, click)
     `ncs` is a nested list indexed by (interaction, batch_element, click)
-    the last list inside `pcs` or `ncs` corresponds to the new click(s) to encode.
-    `pos_encoding`, `neg_encoding` are the previous encodings to be overwritten.
+    the last list inside `pcs` or `ncs` refers to the new click(s) to encode.
+    `pos_encoding`, `neg_encoding` are previous encodings to be overwritten.
     """
     for _pcs, _ncs in zip(pcs, ncs):  # of dim (batch_element, click)
         pos_encoding, neg_encoding = encode_disks_last_clicks(
-            _pcs, _ncs, pos_encoding, neg_encoding, radius
+            [_pcs], [_ncs], pos_encoding, neg_encoding, radius
         )
     return pos_encoding, neg_encoding
 
 
-######### Disks end ###############
+# Disks end

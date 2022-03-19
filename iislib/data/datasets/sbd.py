@@ -1,5 +1,7 @@
 from pathlib import Path
-from typing import Any, Tuple, Union
+from typing import Any
+from typing import Tuple
+from typing import Union
 
 import cv2
 import numpy as np
@@ -34,7 +36,7 @@ class SBDDataset(SegDataset):
             self.dataset_samples = [x.strip() for x in f.readlines()]
         self.at_child_init_end()
 
-    def get_sample(self, index: int) -> Tuple(np.ndarray, np.ndarray, Any):
+    def get_sample(self, index: int) -> Tuple[np.ndarray, np.ndarray, Any]:
         image_name = self.dataset_samples[index]
         image_path = str(self._images_path / f"{image_name}.jpg")
         inst_info_path = str(self._insts_path / f"{image_name}.mat")

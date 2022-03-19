@@ -1,5 +1,4 @@
-##### from OpenMMLab #####
-
+# from OpenMMLab
 # Copyright (c) OpenMMLab. All rights reserved.
 from collections import OrderedDict
 
@@ -466,7 +465,7 @@ def total_area_to_metrics(
     return ret_metrics
 
 
-### custom
+# custom
 
 
 def mse(output, gt_mask):

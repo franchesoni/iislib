@@ -3,7 +3,7 @@ def test_training_logic():
     import segmentation_models_pytorch as smp
     import torch
     from data.datasets.coco_lvis import CocoLvisDataset
-    from data.iis_dataset import RegionDataLoader, RegionDataset, visualize
+    from data.iis_dataset import RegionDataset, visualize
     from data.region_selector import random_single
     from data.transforms import RandomCrop
     from engine.training_logic import interact
@@ -30,7 +30,7 @@ def test_training_logic():
 
     for ind, batch in enumerate(iis_dataloader):
         print(ind)
-        images, masks, infos = batch["image"], batch["mask"], batch["info"]
+        images, masks = batch["image"], batch["mask"]
         output, pc_mask, nc_mask, pcs, ncs = interact(
             model, batch, interaction_steps=3, clicks_per_step=3
         )

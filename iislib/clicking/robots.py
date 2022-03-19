@@ -4,9 +4,11 @@ There are robots in increasing complexity level:
 - robot_01 : randomly samples and sets pos/neg according to target only
 - robot_02 : randomly samples from false region only
 - robot_03 : randomly samples from largest false region only
-- robot_04 : randomly samples from largest false region considering previous clicks
+- robot_04 : randomly samples from largest false region considering
+previous clicks
 - robot_05 : distance map sampling considering previous clicks
-- robot_99 : center sampling largest false region considering previous clicks as in 99% paper
+- robot_99 : center sampling largest false region considering previous
+clicks as in 99% paper
 - robot_ritm : sampling as in RITM paper
 
 All the robots 0x do
@@ -16,8 +18,8 @@ All the robots 0x do
 - Add these points to the previous list
 - Encodes the clicks if an encoder is passed needed
 """
-
-from typing import List, Tuple, Union
+from typing import List
+from typing import Union
 
 import torch
 from clicking.utils import output_target_are_B1HW_in_01
@@ -31,10 +33,10 @@ Clicks = List[
 def robot_01(
     outputs: torch.Tensor,  # (B, C, H, W), C=1, contained in [0, 1] (interval)
     targets: torch.Tensor,  # (B, C, H, W), C=1, contained in {0, 1} (set)
+    pcs: Clicks,  # indexed by (interaction, batch_element, click)
+    ncs: Clicks,
     n_points: int = 1,
-    pcs: Clicks = [],  # indexed by (interaction, batch_element, click)
-    ncs: Clicks = [],
-) -> Tuple(Clicks, Clicks):
+) -> tuple[Clicks, Clicks]:
     """
     Adds n_points into the lists `pcs` and `ncs`
     Randomly samples according to target only.
@@ -83,14 +85,19 @@ def robot_01(
 #     """Simple point getter.
 #     - Adds positive and negative clicks on a random number.
 #     - If first iteration, add only positive clicks
-#     - Sample points from erroneous regions (false positive or false negative regions)
+#     - Sample points from erroneous regions (false positive or false
+# negative regions)
 #     - Sample positive points closer to the center
 #     - Sample negative points uniformly
 #     - Add these points to previous point masks
 #     """
 #     # intialize prev clicks at zero if needed
-#     prev_pc_mask = torch.zeros_like(gt_mask) if prev_pc_mask is None else prev_pc_mask
-#     prev_nc_mask = torch.zeros_like(gt_mask) if prev_nc_mask is None else prev_nc_mask
+#     prev_pc_mask = (
+#         torch.zeros_like(gt_mask) if prev_pc_mask is None else prev_pc_mask
+#     )
+#     prev_nc_mask = (
+#         torch.zeros_like(gt_mask) if prev_nc_mask is None else prev_nc_mask
+#     )
 
 #     pos_region = 1 * (
 #         prev_output < gt_mask
@@ -104,7 +111,8 @@ def robot_01(
 #     elif n_positive is None:  # sample how many positive
 #         n_positive = torch.randint(
 #             n_points + 1, (1,)
-#         )  # anything in [0, n_points]  CORRECT  # how many of the clicks are positive vs negative
+#         )  # anything in [0, n_points]  CORRECT  # how many of the clicks
+# # are positive vs negative
 
 #     pos_clicks = get_positive_clicks_batch(n_positive, pos_region)
 #     neg_clicks = get_positive_clicks_batch(

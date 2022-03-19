@@ -6,12 +6,14 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 import torchvision.transforms
-from clicking.encode import encode_clicks, encode_disks
+from clicking.encode import encode_clicks
+from clicking.encode import encode_disks
 from clicking.robots import robot_01
-from clicking.utils import norm_fn, visualize_on_test
+from clicking.utils import norm_fn
 from data.iis_dataset import EvaluationDataset
-from engine.metrics import eval_metrics, mse
-from torchvision.transforms.functional import center_crop, resize
+from engine.metrics import eval_metrics
+from torchvision.transforms.functional import center_crop
+from torchvision.transforms.functional import resize
 
 """Testing of any method
 - Loads batches from an EvaluationDataset
@@ -159,7 +161,9 @@ def test():
         for iter_ind in range(max_n_clicks):
             pcs, ncs = robot(y, target, n_points=1, pcs=pcs, ncs=ncs)
             y, z = model(image, z, pcs, ncs)  # (B, 1, H, W), z
-            # visualize_on_test(to_np(image[0]), np.array(target[0][0]), output=np.array(y[0][0].detach()), pcs=pcs, ncs=ncs, name=f'{model_name}_{bi}_{iter_ind}', destdir='tmp_res')
+            # visualize_on_test(to_np(image[0]), np.array(target[0][0]),
+            # output=np.array(y[0][0].detach()), pcs=pcs, ncs=ncs,
+            # name=f'{model_name}_{bi}_{iter_ind}', destdir='tmp_res')
 
             ss = compute_scores(
                 1 * (0.5 < norm_fn(y)),

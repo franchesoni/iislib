@@ -1,5 +1,3 @@
-from code import interact
-
 import torch
 
 
@@ -20,7 +18,8 @@ def interact(
         ), "This should be an int if `interaction_steps` is None"
         interaction_steps_m1 = torch.randint(
             max_interactions, (1,)
-        )  # we don't add 1 because that 1 is the step in which gradients are computed (outside the for loop)
+        )  # we don't add 1 because that 1 is the step in which gradients
+        # are computed (outside the for loop)
 
     image, target = (
         batch["image"],
@@ -51,9 +50,28 @@ def interact(
     return y, z, pcs, ncs
 
 
-# def interact_single_step(is_first_iter, model, image, gt_mask, prev_output=None, n_clicks=1, pc_mask=None, nc_mask=None, pcs=[], ncs=[]):
-#     image = image[None].permute(0, 3, 1, 2) if image.shape[-1] == 3 else image[None]
-#     gt_mask = gt_mask[None].permute(0, 3, 1, 2) if gt_mask.shape[-1] == 1 else gt_mask[None]
+# def interact_single_step(
+#     is_first_iter,
+#     model,
+#     image,
+#     gt_mask,
+#     prev_output=None,
+#     n_clicks=1,
+#     pc_mask=None,
+#     nc_mask=None,
+#     pcs=[],
+#     ncs=[],
+# ):
+#     image = (
+#         image[None].permute(0, 3, 1, 2)
+#         if image.shape[-1] == 3
+#         else image[None]
+#     )
+#     gt_mask = (
+#         gt_mask[None].permute(0, 3, 1, 2)
+#         if gt_mask.shape[-1] == 1
+#         else gt_mask[None]
+#     )
 #     if prev_output is None:
 #         prev_output = torch.zeros_like(image[:, :1])
 
@@ -71,5 +89,7 @@ def interact(
 #         x, aux = image, torch.cat(
 #             (pc_mask, nc_mask, prev_output), dim=1
 #         )  # image and aux input, passed separately because preprocessing
-#         output = torch.sigmoid(model(x, aux))  # actual computation of gradients
+#         output = torch.sigmoid(
+#             model(x, aux)
+#         )  # actual computation of gradients
 #     return output, pcs, ncs, pc_mask, nc_mask

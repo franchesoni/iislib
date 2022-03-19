@@ -9,21 +9,23 @@ class LitIIS(pl.LightningModule):
         loss_fn,
         robot_click,
         iis_model_cls,
-        iis_model_args_list=[],
-        iis_model_kwargs_dict={},
-        training_metrics={},
-        validation_metrics={},
+        iis_model_args_list=None,
+        iis_model_kwargs_dict=None,
+        training_metrics=None,
+        validation_metrics=None,
         interaction_steps=3,
         lr=0.0001,
     ):
         super().__init__()
         self.save_hyperparameters()
+        iis_model_args_list = iis_model_args_list or []
+        iis_model_kwargs_dict = iis_model_kwargs_dict or {}
         self.model = iis_model_cls(
             *iis_model_args_list, **iis_model_kwargs_dict
         )
         self.loss_fn = loss_fn
         self.robot_click = robot_click
-        self.training_metrics = training_metrics
+        self.training_metrics = training_metrics or {}
         self.validation_metrics = (
             validation_metrics if len(validation_metrics) else training_metrics
         )
@@ -46,14 +48,13 @@ class LitIIS(pl.LightningModule):
             batch_idx=batch_idx,
         )
         target = batch["mask"]
-        breakpoint()
         loss = self.loss_fn(
             y.squeeze(), target.squeeze()
         )  # get dimensions right
         self.log("train_loss", loss)
         for metric_name in self.training_metrics:
             self.log(
-                metric_name, self.training_metrics[metric_name](output, target)
+                metric_name, self.training_metrics[metric_name](y, target)
             )
         return loss
 
@@ -70,7 +71,6 @@ class LitIIS(pl.LightningModule):
             batch_idx=batch_idx,
         )
         target = batch["mask"]
-        breakpoint()
         loss = self.loss_fn(
             y.squeeze(), target.squeeze()
         )  # get dimensions right
@@ -78,7 +78,7 @@ class LitIIS(pl.LightningModule):
         for metric_name in self.validation_metrics:
             self.log(
                 metric_name,
-                self.validation_metrics[metric_name](output, target),
+                self.validation_metrics[metric_name](y, target),
             )
         return loss
 
