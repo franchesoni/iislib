@@ -1,7 +1,7 @@
 """
 Robot clicking is defined in this script.
 There are robots in increasing complexity level:
-- robot_01 : randomly samples according to target only
+- robot_01 : randomly samples and sets pos/neg according to target only
 - robot_02 : randomly samples from false region only
 - robot_03 : randomly samples from largest false region only
 - robot_04 : randomly samples from largest false region considering previous clicks
@@ -17,29 +17,33 @@ All the robots 0x do
 - Encodes the clicks if an encoder is passed needed
 """
 
+from typing import List, Tuple, Union
 import torch
 
 from clicking.utils import output_target_are_B1HW_in_01
+
+Point = Union[List[int], torch.Tensor] 
+Clicks = List[List[List[Point]]]  # axes : (interaction, batch_element, click_number)
 
 def robot_01(
     outputs: torch.Tensor,  # (B, C, H, W), C=1, contained in [0, 1] (interval)
     targets: torch.Tensor,  # (B, C, H, W), C=1, contained in {0, 1} (set)
     n_points:int = 1,
-    pcs: list =[],  # indexed by (interaction, batch_element, click) 
-    ncs: list =[],
-):
+    pcs: Clicks=[],  # indexed by (interaction, batch_element, click) 
+    ncs: Clicks=[],
+) -> Tuple(Clicks, Clicks):
     """
     Adds n_points into the lists `pcs` and `ncs` 
     Randomly samples according to target only.
     """
     assert output_target_are_B1HW_in_01(outputs, targets)
-    i_coord = torch.randint(outputs.shape[-2], (n_points,))
+    i_coord = torch.randint(outputs.shape[-2], (n_points,))  # the same clicks for all elements in batch
     j_coord = torch.randint(outputs.shape[-1], (n_points,))
-    clicks = list(zip(i_coord, j_coord))  # same for all elements in batch
+    clicks = list(torch.stack((i_coord, j_coord), axis=1))  # (batch_element, coord) or list of points
     is_positive = [targets[:, :, i, j] == 1 for i, j in clicks]  # a bool vector per click
 
     _pcs, _ncs = [], []  # (batch element, click)
-    for ind_target in range(len(targets)):  # add for each image the positive clicks
+    for ind_target in range(len(targets)):  # add the clicks for each image in the batch
         _pcs.append([])
         _ncs.append([])
         for ind_click, click in enumerate(clicks):
@@ -49,7 +53,7 @@ def robot_01(
                 _ncs[-1].append(click)
 
     pcs.append(_pcs)  # nested list indexed as follows:
-    ncs.append(_ncs)  # (interaction, batch, click)
+    ncs.append(_ncs)  # (interaction, batch, click) or list of list of list of Points
 
     return pcs, ncs
 

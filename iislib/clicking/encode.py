@@ -1,11 +1,12 @@
-import copy
-from typing import List, Union, NewType
+from typing import List, Tuple, Union
 
 import numpy as np
 import torch
 
-Point = Union[List[int], torch.Tensor]
+Point = Union[List[int], torch.Tensor] 
 
+
+######### Disks ###############
 def np_simplest_disk(radius: int) -> np.ndarray:
     '''Creates a binary matrix containing a disk of the given radius using numpy'''
     out_side = radius * 2 + 1
@@ -55,20 +56,20 @@ def draw_disk_from_single_coords(point: Point, initial_mask: torch.Tensor, radiu
     )
     return out_mask
 
-def disk_mask_from_coords(points: List[Point], prev_mask: torch.Tensor, radius: int = 5):
+def disk_mask_from_coords(points: List[Point], prev_mask: torch.Tensor, radius: int = 5) -> torch.Tensor:
     '''Adds disks of given `radius` centered in `points` list to `prev_mask`'''
     out_mask = prev_mask.clone()
     for point in points:
         out_mask = draw_disk_from_single_coords(point, out_mask, radius=radius)
     return out_mask
 
-def disk_mask_from_coords_batch(pointss: List[List[Point]], prev_masks: List[torch.Tensor], radius: int = 5):
+def disk_mask_from_coords_batch(pointss: List[List[Point]], prev_masks: torch.Tensor, radius: int = 5) -> torch.Tensor:
     '''Calls `disk_mask_from_coords` for each pair of `points` list and `prev_mask` in `zip(pointss, prev_masks)`'''
     assert len(pmshape := prev_masks.shape) == 4 and pmshape[1] == 1, f'`prev_masks` should be (B, 1, H, W) but is {pmshape}'
     assert len(pointss) == len(prev_masks), 'Batch size should be consistent across inputs'
     return torch.stack([disk_mask_from_coords(pointss[ind], prev_masks[ind][0], radius)[None, ...] for ind in range(len(pointss))])
 
-def encode_disks_last_clicks(pcs: List[List[List[Point]]], ncs: List[List[List[Point]]], pos_encoding: List[torch.Tensor], neg_encoding: List[torch.Tensor], radius: int =5):
+def encode_disks_last_clicks(pcs: List[List[List[Point]]], ncs: List[List[List[Point]]], pos_encoding: List[torch.Tensor], neg_encoding: List[torch.Tensor], radius: int =5) -> Tuple(List[torch.Tensor], List[torch.Tensor]):
     """
     `pcs` is a nested list indexed by (interaction, batch_element, click)
     `ncs` is a nested list indexed by (interaction, batch_element, click)
@@ -81,8 +82,7 @@ def encode_disks_last_clicks(pcs: List[List[List[Point]]], ncs: List[List[List[P
     neg_encoding = disk_mask_from_coords_batch(last_ncs, neg_encoding, radius=radius)
     return pos_encoding, neg_encoding
 
-
-def encode_disks_from_scratch(pcs: List[List[List[Point]]], ncs: List[List[List[Point]]], pos_encoding: List[torch.Tensor], neg_encoding: List[torch.Tensor], radius: int =5):
+def encode_disks_from_scratch(pcs: List[List[List[Point]]], ncs: List[List[List[Point]]], pos_encoding: List[torch.Tensor], neg_encoding: List[torch.Tensor], radius: int =5) -> Tuple(List[torch.Tensor], List[torch.Tensor]):
     """
     `pcs` is a nested list indexed by (interaction, batch_element, click)
     `ncs` is a nested list indexed by (interaction, batch_element, click)
@@ -93,3 +93,4 @@ def encode_disks_from_scratch(pcs: List[List[List[Point]]], ncs: List[List[List[
         pos_encoding, neg_encoding = encode_disks_last_clicks(_pcs, _ncs, pos_encoding, neg_encoding, radius)
     return pos_encoding, neg_encoding
 
+######### Disks end ###############
