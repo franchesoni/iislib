@@ -1,9 +1,8 @@
 from pathlib import Path
+from typing import Any, Union, Tuple
 from scipy.io import loadmat
-from unittest import removeResult
 import numpy as np
 import cv2
-from copy import deepcopy
 
 from data.iis_dataset import SegDataset
 
@@ -15,8 +14,8 @@ class SBDDataset(SegDataset):
     '''
     def __init__(
         self,
-        dataset_path,
-        split="train",
+        dataset_path:Union[str, Path], 
+        split:str="train",
     ):
         super().__init__()
         assert split in {'train', 'test'}
@@ -29,16 +28,15 @@ class SBDDataset(SegDataset):
 
         with open(self.dataset_path / f'{split}.txt', 'r') as f:
             self.dataset_samples = [x.strip() for x in f.readlines()]
-        self.check_sample()
+        self.at_child_init_end()
 
-    def get_sample(self, index):
+    def get_sample(self, index:int) -> Tuple(np.ndarray, np.ndarray, Any):
         image_name = self.dataset_samples[index]
         image_path = str(self._images_path / f'{image_name}.jpg')
         inst_info_path = str(self._insts_path / f'{image_name}.mat')
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         instances_mask = loadmat(str(inst_info_path))['GTinst'][0][0][0].astype(np.int32)[..., None]  # add channel dimension
-
         layers, info = instances_mask, None
         return image, layers, info
 

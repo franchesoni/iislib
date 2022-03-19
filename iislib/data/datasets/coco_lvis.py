@@ -1,9 +1,7 @@
 from pathlib import Path
 import pickle
 import os
-import bisect
-import random
-from unittest import removeResult
+from typing import Any, Callable, Union, Tuple
 import numpy as np
 import cv2
 from copy import deepcopy
@@ -11,7 +9,7 @@ from copy import deepcopy
 from data.iis_dataset import SegDataset
 
 
-def drop_from_first_if_not_in_second(alist: list, blist: list, fn_a=None, fn_b=None) -> list:
+def drop_from_first_if_not_in_second(alist: list, blist: list, fn_a:Union[Callable, None]=None, fn_b:Union[Callable, None]=None) -> Tuple(list, list):
     '''this works for sorted lists over which we apply fn_a and fn_b (and remain sorted)'''
     assert type(alist) == type(blist) == list
     assert alist == sorted(alist) and blist == sorted(blist), 'input lists should be sorted'
@@ -58,10 +56,9 @@ class CocoLvisDataset(SegDataset):
 
     def __init__(
         self,
-        dataset_path,
-        split="train",
-        stuff_prob=0.0,
-        anno_file="hannotation.pickle",
+        dataset_path:Union[str, Path], 
+        split:str="train",
+        anno_file:str="hannotation.pickle",
     ):
         super().__init__()
         dataset_path = Path(dataset_path)
@@ -74,14 +71,14 @@ class CocoLvisDataset(SegDataset):
         # filter out those names that are not present in the actual data
         self.available_images = sorted(os.listdir(self._images_path))
         self.dataset_samples, _ = drop_from_first_if_not_in_second(self.dataset_samples, self.available_images, fn_a=lambda dsample: dsample[0] + '.jpg')
-        self.check_sample()
+        self.at_child_init_end()
 
-        # # to inspect, uncomment below
+        # # to inspect what we are doing, uncomment this part below
         # ds, removed_indices = drop_from_first_if_not_in_second(self.dataset_samples, self.available_images, fn_a=lambda dsample: dsample[0] + '.jpg')
         # removed_entries = [e for i, e in enumerate(self.dataset_samples) if i in removed_indices]
 
 
-    def get_sample(self, index):
+    def get_sample(self, index:int) -> Tuple(np.ndarray, np.ndarray, Any):
         image_id, sample = self.dataset_samples[index]
         image_path = self._images_path / f"{image_id}.jpg"
 

@@ -1,5 +1,7 @@
+from abc import ABC, abstractmethod
 import collections
 import re
+from typing import Any, Tuple
 from data.region_selector import dummy
 import torch
 from torch._six import string_classes
@@ -8,26 +10,27 @@ import numpy as np
 from data.transforms import norm_fn
 from tests.visualization import visualize
 
-class SegDataset(torch.utils.data.Dataset):
+class SegDataset(torch.utils.data.Dataset, ABC):
     """Segmentation dataset structure. Load all datasets subclassing the method and
     defining the `get_sample` method. All masks should be given as output in such a
     deterministic function."""
 
+    @abstractmethod
     def __init__(self):
         super().__init__()
-        self.dataset_samples = (
-            None  # dataset should be loaded on the init of the child class
-        )
 
-    def get_sample(self, index):
-        raise NotImplementedError(
-            "You should write this for your specific dataset, this is only a placeholder."
-        )
-        return image, masks, info  # expected output
+    @abstractmethod
+    def get_sample(self, index:int)-> Tuple(np.ndarray, np.ndarray, Any):
+        """returns (image, layers, info)"""
+
+    def at_child_init_end(self):
+        '''Call this at child's `__init__` end'''
+        assert hasattr(self, 'dataset_samples')
+        self.check_sample()
 
     def check_sample(self):
         sample = self.get_sample(0)
-        image, masks, info = sample
+        image, masks, info = sample  # what a sampel should be
         assert (
             image.shape[2] == 3
         ), f"Image should be RGB with channels last but its shape is {image.shape}"
@@ -36,10 +39,10 @@ class SegDataset(torch.utils.data.Dataset):
             image.shape[:2] == masks.shape[:2]
         ), "Image and masks should have the same shape but their shapes are {image.shape} and {masks.shape}"
 
-    def __getitem__(self, index):
+    def __getitem__(self, index:int) -> Tuple(np.ndarray, np.ndarray, Any):
         return self.get_sample(index)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.dataset_samples)
 
 
@@ -57,20 +60,14 @@ class RegionDatasetWithInfo(torch.utils.data.Dataset):
         seg_dataset,
         region_selector,
         augmentator=None,
-        debug_visualize=False,
     ):
         super().__init__()
         self.seg_dataset = seg_dataset
         self.region_selector = region_selector
         self.augmentator = (lambda x: x) if augmentator is None else augmentator
-        self.debug_visualize = debug_visualize
 
     def __getitem__(self, index: int):
         image, all_masks, info = self.seg_dataset[index]
-        if self.debug_visualize:
-            visualize(image, "orig_image")
-            for layer_ind in range(all_masks.shape[-1]):
-                visualize(all_masks[:, :, layer_ind], f"layer_{layer_ind}")
         target_region = self.region_selector(image, all_masks, info)
         image, target_region = self.augmentator(image, target_region)
         return np.array(norm_fn(image), dtype=float), np.array(norm_fn(target_region), dtype=float), info
