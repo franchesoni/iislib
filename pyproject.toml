@@ -1,5 +1,5 @@
 [project]
-name = "iis_framework"
+name = "iislib"
 version = "0.0.1"
 authors = [
     {email = "marchesoniacland@gmail.com"},
@@ -14,4 +14,4 @@ classifiers = [
 ]
 
 [project.urls]
-repository = "github.com/franchesoni/iis_framework"
+repository = "github.com/franchesoni/iislib"

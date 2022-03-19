@@ -5,16 +5,16 @@ import numpy as np
 import copy
 import cv2
 
-def check_masks(outputs, targets):
-    '''torch tensors of (B, C, H, W) shape and C=1. Target should be binary and output should be in [0,1]'''
-    assert len(outputs.shape) == len(targets.shape) == 4
-    assert outputs.shape[1] == targets.shape[1] == 1
-    assert type(outputs) == type(targets) == torch.Tensor
-    assert set([int(e) for e in targets.unique()]).issubset({0, 1})
-    assert (0 <= outputs.min() and outputs.max() <= 1)
 
-
-
+def output_target_are_B1HW_in_01(outputs, targets):
+    """torch tensors of (B, C, H, W) shape and C=1. Target should be binary and output should be in [0,1]"""
+    return (
+        (len(outputs.shape) == len(targets.shape) == 4)
+        and (outputs.shape[1] == targets.shape[1] == 1)
+        and (type(outputs) == type(targets) == torch.Tensor)
+        and (set([int(e) for e in targets.unique()]).issubset({0, 1}))
+        and ((0 <= outputs.min() and outputs.max() <= 1))
+    )
 
 
 def get_d_prob_map(mask, hard_thresh=1e-6):
@@ -150,9 +150,6 @@ def get_positive_click(mask, near_border=False, uniform_probs=False, erode_iters
         )  # get weighted from center region
 
 
-
-
-
 # get_positive_clicks can be made faster by eroding just one time
 def get_positive_clicks_batch(
     n, masks, near_border=False, uniform_probs=False, erode_iters=15
@@ -160,7 +157,7 @@ def get_positive_clicks_batch(
     if n == 0:
         return [[] for _ in range(masks.shape[0])]
     elif n < 0:
-        raise ValueError(f'`n` should be positive but is {n}')
+        raise ValueError(f"`n` should be positive but is {n}")
     else:
         return [
             [
@@ -172,9 +169,8 @@ def get_positive_clicks_batch(
                 )
                 for _ in range(n)
             ]
-            for mask in masks  
+            for mask in masks
         ]
-
 
 
 def get_negative_clicks(n, mask, near_border, uniform_probs, dilate_iters):
@@ -191,6 +187,3 @@ def get_negative_clicks(n, mask, near_border, uniform_probs, dilate_iters):
         for _ in range(n)
     ]
     return list(filter(lambda x: x is not None, ncs))  # remove None elements
-
-
-

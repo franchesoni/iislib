@@ -166,3 +166,4 @@ Notes
    ``self.net(image_nd, points_nd)['instances']``. The other classes are
    children of this one, so the model is called in the same way (some
    other optimizations may be done).
+

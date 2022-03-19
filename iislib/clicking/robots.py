@@ -19,22 +19,20 @@ All the robots 0x do
 
 import torch
 
-from clicking.utils import check_masks
-
-
+from clicking.utils import output_target_are_B1HW_in_01
 
 def robot_01(
-    outputs,  # (B, C, H, W), C=1, contained in [0, 1] (interval)
-    targets,  # (B, C, H, W), C=1, contained in {0, 1} (set)
-    n_points=1,
-    pcs=[],  # indexed by (interaction, batch_element, click) 
-    ncs=[],
+    outputs: torch.Tensor,  # (B, C, H, W), C=1, contained in [0, 1] (interval)
+    targets: torch.Tensor,  # (B, C, H, W), C=1, contained in {0, 1} (set)
+    n_points:int = 1,
+    pcs: list =[],  # indexed by (interaction, batch_element, click) 
+    ncs: list =[],
 ):
     """
     Adds n_points into the lists `pcs` and `ncs` 
-
-    Randomly samples according to target only."""
-    check_masks(outputs, targets)
+    Randomly samples according to target only.
+    """
+    assert output_target_are_B1HW_in_01(outputs, targets)
     i_coord = torch.randint(outputs.shape[-2], (n_points,))
     j_coord = torch.randint(outputs.shape[-1], (n_points,))
     clicks = list(zip(i_coord, j_coord))  # same for all elements in batch
