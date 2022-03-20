@@ -1,8 +1,10 @@
 import os
 from pathlib import Path
+from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 
 
 def visualize_on_test(
@@ -29,13 +31,13 @@ def visualize_on_test(
     plt.imshow(out)
     for cind, pc_list in enumerate(pcs):
         for pc in pc_list[0]:  # assume batch=1
-            if pc != -1:
+            if (pc == -1) is not True:
                 plt.scatter(
                     pc[1], pc[0], s=40 // len(pcs) * (cind + 1), color="g"
                 )
     for cind, nc_list in enumerate(ncs):
         for nc in nc_list[0]:  # assume batch=1
-            if nc != -1:
+            if (nc == -1) is not True:
                 plt.scatter(
                     nc[1], nc[0], s=40 // len(pcs) * (cind + 1), color="r"
                 )
@@ -51,13 +53,13 @@ def visualize_on_test(
     )
     for cind, pc_list in enumerate(pcs):
         for pc in pc_list[0]:  # assume batch=1
-            if pc != -1:
+            if (pc == -1) is not True:
                 plt.scatter(
                     pc[1], pc[0], s=40 // len(pcs) * (cind + 1), color="g"
                 )
     for cind, nc_list in enumerate(ncs):
         for nc in nc_list[0]:  # assume batch=1
-            if nc != -1:
+            if (nc == -1) is not True:
                 plt.scatter(
                     nc[1], nc[0], s=40 // len(pcs) * (cind + 1), color="r"
                 )
@@ -68,13 +70,13 @@ def visualize_on_test(
     plt.imshow(norm_fn(output))
     for cind, pc_list in enumerate(pcs):
         for pc in pc_list[0]:  # assume batch=1
-            if pc != -1:
+            if (pc == -1) is not True:
                 plt.scatter(
                     pc[1], pc[0], s=40 // len(pcs) * (cind + 1), color="g"
                 )
     for cind, nc_list in enumerate(ncs):
         for nc in nc_list[0]:  # assume batch=1
-            if nc != -1:
+            if (nc == -1) is not True:
                 plt.scatter(
                     nc[1], nc[0], s=40 // len(pcs) * (cind + 1), color="r"
                 )
@@ -121,5 +123,13 @@ def visualize(img, name):
     plt.close()
 
 
-def norm_fn(x):
-    return (x - x.min()) / (x.max() - x.min())
+def norm_fn(
+    x: Union[torch.Tensor, np.ndarray]
+) -> Union[torch.Tensor, np.ndarray]:
+    if (xmax := x.max()) != (xmin := x.min()):
+        return (x - xmin) / (xmax - xmin)
+    if isinstance(x, np.ndarray):
+        return np.ones_like(x) * xmax
+    if isinstance(x, torch.Tensor):
+        return torch.ones_like(x) * xmax
+    raise ValueError(f"`x` type is {type(x)} instead of Tensor or ndarray")

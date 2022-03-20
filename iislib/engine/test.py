@@ -1,19 +1,24 @@
-import glob
+import functools
 import os
-from pathlib import Path
 
 import numpy as np
 import pytorch_lightning as pl
 import torch
 import torchvision.transforms
-from clicking.encode import encode_clicks
-from clicking.encode import encode_disks
-from clicking.robots import robot_01
-from clicking.utils import norm_fn
+from clicking.robots import robot_03
 from data.iis_dataset import EvaluationDataset
+from data.transforms import norm_fn
 from engine.metrics import eval_metrics
 from torchvision.transforms.functional import center_crop
 from torchvision.transforms.functional import resize
+
+# from clicking.robots import robot_01
+# from clicking.robots import robot_02
+
+# import sys
+# sys.path.append("/home/franchesoni/iis/iislib/tests/")
+# from visualization import visualize_on_test
+
 
 """Testing of any method
 - Loads batches from an EvaluationDataset
@@ -37,45 +42,46 @@ def to_np(img):
 
 
 def get_model():
-    from models.lightning import LitIIS
+    raise NotImplementedError
+    # from models.lightning import LitIIS
 
-    logs_dir = Path(__file__).parent / "lightning_logs/"
-    versions = [vname for vname in os.listdir(logs_dir)]
-    last_version = max(int(vname.split("_")[-1]) for vname in versions)
-    checkpoint_path = glob.glob(
-        str(logs_dir / f"version_{last_version}" / "checkpoints") + "/*"
-    )[0]
-    model = LitIIS.load_from_checkpoint(checkpoint_path)
-    encoding_fn = encode_disks
+    # logs_dir = Path(__file__).parent / "lightning_logs/"
+    # versions = [vname for vname in os.listdir(logs_dir)]
+    # last_version = max(int(vname.split("_")[-1]) for vname in versions)
+    # checkpoint_path = glob.glob(
+    #     str(logs_dir / f"version_{last_version}" / "checkpoints") + "/*"
+    # )[0]
+    # model = LitIIS.load_from_checkpoint(checkpoint_path)
+    # encoding_fn = encode_disks
 
-    def fwd_lit_iis(image, z, pcs, ncs):
-        pos_encoding, neg_encoding = z["pos_encoding"], z["neg_encoding"]
-        pos_encoding, neg_encoding = encode_clicks(
-            pcs, ncs, encoding_fn, pos_encoding, neg_encoding
-        )
-        x, aux = image, torch.cat(
-            (pos_encoding, neg_encoding, z["prev_output"]), dim=1
-        )
-        prev_output = torch.sigmoid(model(x, aux))
-        return prev_output, {
-            "prev_output": prev_output,
-            "pos_encoding": pos_encoding,
-            "neg_encoding": neg_encoding,
-        }
+    # def fwd_lit_iis(image, z, pcs, ncs):
+    #     pos_encoding, neg_encoding = z["pos_encoding"], z["neg_encoding"]
+    #     pos_encoding, neg_encoding = encode_clicks(
+    #         pcs, ncs, encoding_fn, pos_encoding, neg_encoding
+    #     )
+    #     x, aux = image, torch.cat(
+    #         (pos_encoding, neg_encoding, z["prev_output"]), dim=1
+    #     )
+    #     prev_output = torch.sigmoid(model(x, aux))
+    #     return prev_output, {
+    #         "prev_output": prev_output,
+    #         "pos_encoding": pos_encoding,
+    #         "neg_encoding": neg_encoding,
+    #     }
 
-    def initialize_z(image, target):
-        prev_output = torch.zeros_like(image[:, :1])
-        pos_encoding, neg_encoding = [prev_output.clone()] * 2
-        return {
-            "prev_output": prev_output,
-            "pos_encoding": pos_encoding,
-            "neg_encoding": neg_encoding,
-        }
+    # def initialize_z(image, target):
+    #     prev_output = torch.zeros_like(image[:, :1])
+    #     pos_encoding, neg_encoding = [prev_output.clone()] * 2
+    #     return {
+    #         "prev_output": prev_output,
+    #         "pos_encoding": pos_encoding,
+    #         "neg_encoding": neg_encoding,
+    #     }
 
-    def initialize_y(image, target):
-        return torch.zeros_like(image[:, :1])
+    # def initialize_y(image, target):
+    #     return torch.zeros_like(image[:, :1])
 
-    return fwd_lit_iis, initialize_z, initialize_y
+    # return fwd_lit_iis, initialize_z, initialize_y
 
 
 def get_model_gto99():
@@ -134,11 +140,18 @@ def get_dataset():
 
 def test():
     seed = 0
-    model_name = "ours"
+    model_name = "gto99"
+    prefix = "3_"
+    destdir = "/home/franchesoni/iis/iislib/results/tmp"
     max_n_clicks = 20
-    compute_scores = eval_metrics
+    compute_scores = functools.partial(
+        eval_metrics,
+        num_classes=1,
+        ignore_index=0,
+        metrics=["mIoU", "mDice", "mFscore"],
+    )
 
-    robot = robot_01
+    robot = robot_03
     if model_name == "ritm":
         model, init_z, init_y = get_model_ritm()
     elif model_name == "gto99":
@@ -161,21 +174,24 @@ def test():
         for iter_ind in range(max_n_clicks):
             pcs, ncs = robot(y, target, n_points=1, pcs=pcs, ncs=ncs)
             y, z = model(image, z, pcs, ncs)  # (B, 1, H, W), z
-            # visualize_on_test(to_np(image[0]), np.array(target[0][0]),
-            # output=np.array(y[0][0].detach()), pcs=pcs, ncs=ncs,
-            # name=f'{model_name}_{bi}_{iter_ind}', destdir='tmp_res')
+            # visualize_on_test(
+            #     to_np(image[0]),
+            #     np.array(target[0][0]),
+            #     output=np.array(y[0][0].detach()),
+            #     pcs=pcs,
+            #     ncs=ncs,
+            #     name=f"{prefix}{model_name}_{bi}_{iter_ind}",
+            #     destdir=destdir,
+            # )
 
             ss = compute_scores(
                 1 * (0.5 < norm_fn(y)),
                 norm_fn(target),
-                num_classes=1,
-                ignore_index=0,
-                metrics=["mIoU", "mDice", "mFscore"],
             )
             scores[-1].append(ss)
             print(f"done with batch {bi} click {iter_ind}, score={ss}")
 
-    np.save(f"scores_{model_name}.npy", scores)
+    np.save(os.path.join(destdir, f"scores_{prefix}{model_name}.npy"), scores)
 
 
 if __name__ == "__main__":

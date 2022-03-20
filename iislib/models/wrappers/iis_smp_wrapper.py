@@ -2,19 +2,20 @@ from typing import List
 
 import segmentation_models_pytorch as smp
 import torch
+from models.abstract_model import IISBaseModel
 
 
-# useful for all smp models
-class EarlySMP(torch.nn.Module, smp.encoders._base.EncoderMixin):
+class EarlySMP(IISBaseModel, torch.nn.Module, smp.encoders._base.EncoderMixin):
     def __init__(
         self,
-        click_encoder,
         smp_model_class,
         smp_model_kwargs_dict,
+        click_encoder,
         in_channels=6,
         classes=1,
     ):
-        super().__init__()
+        """`smp_model_kwargs_dict` should be a dict with at least 'encoder_weights' as a key. It is used to init the `smp_model_class`"""
+        super().__init__()  # this should work because only torch.nn.Module has __init__
         assert (
             "encoder_weights" in smp_model_kwargs_dict
         ), 'Sorry, default behavior is undefined. To use pretrained weights\
@@ -33,12 +34,23 @@ class EarlySMP(torch.nn.Module, smp.encoders._base.EncoderMixin):
             else None
         )
 
-    # def forward(self, x, z, pcs, ncs):
-    #     pc_mask = disk_mask_from_coords_batch(pos_clicks, prev_pc_mask)
+    def forward(self, x, z, pcs, ncs):
+        pos_encoding, neg_encoding = torch.zeros_like(
+            x[:, :1, :, :]
+        ), torch.zeros_like(x[:, :1, :, :])
+        pos_encoding, neg_encoding = self.click_encoder(
+            pcs, ncs, pos_encoding, neg_encoding, radius=5
+        )
+        aux = torch.concat(
+            (z["prev_output"], pos_encoding, neg_encoding), axis=1
+        )
+        y = torch.sigmoid(self.x_aux_forward(x, aux))
+        z["prev_output"] = y
+        return y, z
 
     def x_aux_forward(
         self, x: torch.Tensor, aux: torch.Tensor
-    ) -> List[torch.Tensor]:
+    ) -> torch.Tensor:
         x = (
             self.model_preprocessing_fn(x.permute(0, 2, 3, 1)).permute(
                 0, 3, 1, 2
@@ -50,6 +62,12 @@ class EarlySMP(torch.nn.Module, smp.encoders._base.EncoderMixin):
             (x, aux), dim=1
         ).float()  # does this work with lightning?
         return self.model(x_in)
+
+    def init_z(self, image, target):
+        return {"prev_output": torch.zeros_like(target)}
+
+    def init_y(self, image, target):
+        return torch.zeros_like(target)
 
 
 class EncodeSMP(torch.nn.Module, smp.encoders._base.EncoderMixin):

@@ -20,12 +20,17 @@ def interact(
             max_interactions, (1,)
         )  # we don't add 1 because that 1 is the step in which gradients
         # are computed (outside the for loop)
+    else:
+        interaction_steps_m1 = interaction_steps - 1
 
     image, target = (
         batch["image"],
         batch["mask"],
     )
 
+    assert isinstance(image, torch.Tensor) and isinstance(
+        target, torch.Tensor
+    ), "`image` and `target` should be torch tensors"
     assert (
         image.shape[1] == 3
     ), f"Image should be (B, 3, H, W) but is {image.shape}"

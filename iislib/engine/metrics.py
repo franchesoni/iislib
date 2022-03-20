@@ -57,13 +57,13 @@ def intersect_and_union(
          torch.Tensor: The ground truth histogram on all classes.
     """
 
-    # modified so it works with tensors
+    # modified so it works with arrays
     pred_label = (
         torch.from_numpy(pred_label)
-        if type(pred_label) == np.array
+        if isinstance(pred_label, np.ndarray)
         else pred_label
     )
-    label = torch.from_numpy(label) if type(label) == np.array else label
+    label = torch.from_numpy(label) if isinstance(label, np.ndarray) else label
 
     if label_map is not None:
         for old_id, new_id in label_map.items():
@@ -110,7 +110,7 @@ def total_intersect_and_union(
     gt_seg_maps,
     num_classes,
     ignore_index,
-    label_map=dict(),
+    label_map=None,
     reduce_zero_label=False,
 ):
     """Calculate Total Intersection and Union.
@@ -133,10 +133,19 @@ def total_intersect_and_union(
          ndarray: The prediction histogram on all classes.
          ndarray: The ground truth histogram on all classes.
     """
-    total_area_intersect = torch.zeros((num_classes,), dtype=torch.float64)
-    total_area_union = torch.zeros((num_classes,), dtype=torch.float64)
-    total_area_pred_label = torch.zeros((num_classes,), dtype=torch.float64)
-    total_area_label = torch.zeros((num_classes,), dtype=torch.float64)
+    device = results.device
+    total_area_intersect = torch.zeros(
+        (num_classes,), dtype=torch.float64, device=device
+    )
+    total_area_union = torch.zeros(
+        (num_classes,), dtype=torch.float64, device=device
+    )
+    total_area_pred_label = torch.zeros(
+        (num_classes,), dtype=torch.float64, device=device
+    )
+    total_area_label = torch.zeros(
+        (num_classes,), dtype=torch.float64, device=device
+    )
     for result, gt_seg_map in zip(results, gt_seg_maps):
         (
             area_intersect,
@@ -452,9 +461,7 @@ def total_area_to_metrics(
             ret_metrics["Precision"] = precision
             ret_metrics["Recall"] = recall
 
-    ret_metrics = {
-        metric: value.numpy() for metric, value in ret_metrics.items()
-    }
+    ret_metrics = {metric: value for metric, value in ret_metrics.items()}
     if nan_to_num is not None:
         ret_metrics = OrderedDict(
             {

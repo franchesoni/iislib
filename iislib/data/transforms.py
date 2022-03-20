@@ -1,17 +1,133 @@
+from typing import Union
+
 import albumentations as A
 import numpy as np
 import torch
 
 
+def composed_func(list_of_funcs):
+    def transform(
+        image: np.ndarray, mask: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        for func in list_of_funcs:
+            image, mask = func(image, mask)
+        return image, mask
+
+    return transform
+
+
+def fix_mask_shape(
+    image: Union[torch.Tensor, np.ndarray],
+    mask: Union[torch.Tensor, np.ndarray],
+) -> tuple[Union[torch.Tensor, np.ndarray], Union[torch.Tensor, np.ndarray]]:
+    """Adds trailing dimension to mask if needed in image's channel position
+
+    Args:
+        image (Union[torch.Tensor, np.ndarray]): image, (H, W, C) or (C, H, W)
+        mask (Union[torch.Tensor, np.ndarray]): mask, (H, W), or
+
+    Raises:
+        ValueError: if output mask shape is not similar to image shape (flexibility on the channel dim)
+
+    Returns:
+        tuple[Union[torch.Tensor, np.ndarray]: input image
+        Union[torch.Tensor, np.ndarray]]: transformed mask
+    """
+    if len(mask.shape) == 2:
+        if image.shape[0] == min(image.shape):
+            mask = mask[None, ...]  # (1, H, W)
+        elif image.shape[-1] == min(image.shape):
+            mask = mask[..., None]  # (H, W, 1)
+        else:
+            raise ValueError(f"Image has shape {image.shape} which is strange")
+    if not (np.argmin(mask.shape) == np.argmin(image.shape)):
+        raise ValueError(
+            f"output `mask` and `image` should have same channel order but have {mask.shape} and {image.shape} shapes respectively"
+        )
+    return image, mask
+
+
+def to_channel_first(
+    image: Union[torch.Tensor, np.ndarray],
+    mask: Union[torch.Tensor, np.ndarray],
+) -> tuple[Union[torch.Tensor, np.ndarray], Union[torch.Tensor, np.ndarray]]:
+    return to_channel_first_single(image), to_channel_first_single(mask)
+
+
+def to_channel_first_single(
+    image: Union[torch.Tensor, np.ndarray]
+) -> Union[torch.Tensor, np.ndarray]:
+    """Converts to (C, H, W)"""
+    assert (
+        image.ndim == 3
+    ), f"An image should have 3 dimensions! (C, H, W) or (H, W, C). Yours has shape {image.shape}"
+    # if we need to do something
+    if min(image.shape) == image.shape[-1]:
+        if isinstance(image, torch.Tensor):
+            return image.permute(2, 0, 1)
+        if isinstance(image, np.ndarray):
+            return np.transpose(image, (2, 0, 1))
+        raise ValueError(
+            f"image type is {type(image)} which is not a Tensor nor an ndarray"
+        )
+    # if we don't need to change anything
+    if min(image.shape) == image.shape[0]:
+        return image
+    raise ValueError(f"Image has shape {image.shape} which is strange")
+
+
+def to_channel_last(
+    image: Union[torch.Tensor, np.ndarray],
+    mask: Union[torch.Tensor, np.ndarray],
+) -> tuple[Union[torch.Tensor, np.ndarray], Union[torch.Tensor, np.ndarray]]:
+    """Converts to (H, W, C)"""
+    return to_channel_last_single(image), to_channel_last_single(mask)
+
+
+def to_channel_last_single(
+    image: Union[torch.Tensor, np.ndarray]
+) -> Union[torch.Tensor, np.ndarray]:
+    """Converts to (H, W, C)"""
+    assert (
+        image.ndim == 3
+    ), f"An image should have 3 dimensions! (C, H, W) or (H, W, C). Yours has shape {image.shape}"
+    # if we need to do something
+    if min(image.shape) == image.shape[0]:
+        if isinstance(image, torch.Tensor):
+            return image.permute(1, 2, 0)
+        if isinstance(image, np.ndarray):
+            return np.transpose(image, (1, 2, 0))
+        raise ValueError(
+            f"image type is {type(image)} which is not a Tensor nor an ndarray"
+        )
+    # if we don't need to change anything
+    if min(image.shape) == image.shape[-1]:
+        return image
+    raise ValueError(f"Image has shape {image.shape} which is strange")
+
+
 class RandomCrop:
-    def __init__(self, out_size=None):
+    def __init__(self, out_size: tuple):
         self.aug_fn = A.CropNonEmptyMaskIfExists(*out_size)
         # if image is small we take the min of current shape to the max of
         # target shape so we are sure there is always a crop to be made
         self.scale = A.SmallestMaxSize(max_size=max(out_size), interpolation=0)
         self.out_size = out_size
 
-    def __call__(self, image, mask):
+    def __call__(
+        self, image: np.ndarray, mask: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Takes a random crop of the image and mask of size `out_size`.
+        If image is too small for the crop, this function will scale it up.
+
+        Args:
+            image (np.ndarray): color image, (H, W, 3)
+            mask (np.ndarray): mask, (H, W, 1)
+
+        Returns:
+            image (np.ndarray): color image, (H, W, 3)
+            mask (np.ndarray): mask, (H, W, 1)
+        """
         if (
             mask.shape[0] < self.out_size[0]
             or mask.shape[1] < self.out_size[1]
@@ -21,7 +137,7 @@ class RandomCrop:
         tsample = self.aug_fn(
             image=image, mask=mask
         )  # albumentations returns a transformed object
-        return tsample["image"], tsample["mask"][:, :, None]  # add one dim
+        return tsample["image"], tsample["mask"]
 
 
 class Dummy:
@@ -50,15 +166,13 @@ def to_np(img, to_01=True):
     return out
 
 
-def norm_fn(x):
-    return (x - x.min()) / (x.max() - x.min())
-
-
-def scin(img):
-    """Swap Channels If Needed (scin)"""
-    assert img.ndim == 3, "An image has 3 dimensions! (C, H, W) or (H, W, C)"
-    if isinstance(img, torch.Tensor) and min(img.shape) == img.shape[0]:
-        return img.permute(2, 1, 0)
-    if min(img.shape) == img.shape[-1]:
-        return img
-    raise RuntimeError(f"Image has shape {img.shape} which is strange")
+def norm_fn(
+    x: Union[torch.Tensor, np.ndarray]
+) -> Union[torch.Tensor, np.ndarray]:
+    if (xmax := x.max()) != (xmin := x.min()):
+        return (x - xmin) / (xmax - xmin)
+    if isinstance(x, np.ndarray):
+        return np.ones_like(x) * xmax
+    if isinstance(x, torch.Tensor):
+        return torch.ones_like(x) * xmax
+    raise ValueError(f"`x` type is {type(x)} instead of Tensor or ndarray")

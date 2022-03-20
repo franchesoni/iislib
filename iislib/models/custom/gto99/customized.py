@@ -76,7 +76,7 @@ def pred(
 class args:
     use_mask_input = True
     use_usr_encoder = True
-    weights = "/home/franchesoni/iis/iis_framework/models/custom/gto99/InterSegSynthFT.pth"
+    weights = "/home/franchesoni/iis/iislib/iislib/models/custom/gto99/InterSegSynthFT.pth"
     iou_lim = None
     dataset_dir = "/home/franchesoni/adisk/iis_datasets/datasets/GrabCut/"
     predictions_dir = ""
@@ -110,11 +110,11 @@ def gto99(x, z, pcs, ncs, model=model):
     trimap = np.zeros((alpha.shape[0], alpha.shape[1], 2))  # (H, W, 2)
     for ncs_at_step in ncs:
         for nc in ncs_at_step[0]:  # assume batch size = 1
-            if nc:  # if some negative click to do
+            if nc != []:
                 trimap[nc[0], nc[1], 0] = 1
     for pcs_at_step in pcs:
         for pc in pcs_at_step[0]:
-            if pc:
+            if pc != []:
                 trimap[pc[0], pc[1], 1] = 1
     # compute output
     image = to_np(image, to_01=True)  # (H, W, 3)

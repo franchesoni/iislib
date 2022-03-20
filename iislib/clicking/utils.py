@@ -1,10 +1,54 @@
 from typing import Any
+from typing import Sequence
 from typing import Tuple
 from typing import Union
 
 import cv2
 import numpy as np
+import skimage
 import torch
+from torch import Tensor
+from torch.testing._internal.common_dtype import integral_types
+
+
+def sample_points_torch(prob_map: torch.Tensor, n_points=1) -> torch.Tensor:
+    """Sample point from probability map (using torch)"""
+    click_indx = torch.multinomial(prob_map.flatten(), n_points)
+    click_coords = torch_unravel_index(
+        click_indx, prob_map.squeeze().shape
+    )  # squeeze to get (H, W)
+    return torch.stack(click_coords, axis=1)  # (n_click, i/j)
+
+
+def get_largest_incorrect_region(alpha, gt):
+
+    largest_incorrect_BF = []
+    for val in [0, 1]:
+
+        incorrect = (gt == val) * (alpha != val)
+        ret, labels_con = cv2.connectedComponents(
+            incorrect.astype(np.uint8) * 255
+        )
+        label_unique, counts = np.unique(
+            labels_con[labels_con != 0], return_counts=True
+        )
+        if len(counts) > 0:
+            largest_incorrect = labels_con == label_unique[np.argmax(counts)]
+            largest_incorrect_BF.append(largest_incorrect)
+        else:
+            largest_incorrect_BF.append(np.zeros_like(incorrect))
+
+    largest_incorrect_cat = np.argmax(
+        [np.count_nonzero(x) for x in largest_incorrect_BF]
+    )
+    largest_incorrect = largest_incorrect_BF[largest_incorrect_cat]
+    return largest_incorrect, largest_incorrect_cat
+
+
+def get_largest_region(mask: Union[torch.Tensor, np.ndarray]) -> np.ndarray:
+    labels = skimage.morphology.label(mask, connectivity=1)
+    label_unique, counts = np.unique(labels[labels != 0], return_counts=True)
+    return 1 * (labels == label_unique[np.argmax(counts)])
 
 
 def output_target_are_B1HW_in_01(outputs: Any, targets: Any) -> bool:
@@ -236,3 +280,117 @@ def get_outside_border_mask(
 #     ]
 #     return list(filter(lambda x: x is not None, ncs))  # remove None
 # # elements
+
+
+def torch_unravel_index(  # from https://github.com/pytorch/pytorch/pull/66687
+    indices: Tensor,
+    shape: Union[int, Sequence, Tensor],
+    *,
+    as_tuple: bool = True,
+) -> Union[Tuple[Tensor, ...], Tensor]:
+    r"""Converts a `Tensor` of flat indices into a `Tensor` of coordinates
+    for the given target shape.
+    Args:
+        indices: An integral `Tensor` containing flattened indices of a
+        `Tensor` of dimension `shape`.
+        shape: The shape (can be an `int`, a `Sequence` or a `Tensor`) of
+        the `Tensor` for which the flattened `indices` are unraveled.
+    Keyword Args:
+        as_tuple: A boolean value, which if `True` will return the result
+        as tuple of Tensors, else a `Tensor` will be returned. Default: `False`
+    Returns:
+        unraveled coordinates from the given `indices` and `shape`.
+        See description of `as_tuple` for returning a `tuple`.
+    .. note:: The default behaviour of this function is analogous to
+              `numpy.unravel_index <https://numpy.org/doc/stable/reference/generated/numpy.unravel_index.html>`_.
+    Example::
+        >>> indices = torch.tensor([22, 41, 37])
+        >>> shape = (7, 6)
+        >>> torch.unravel_index(indices, shape)
+        tensor([[3, 4],
+                [6, 5],
+                [6, 1]])
+        >>> torch.unravel_index(indices, shape, as_tuple=True)
+        (tensor([3, 6, 6]), tensor([4, 5, 1]))
+        >>> indices = torch.tensor([3, 10, 12])
+        >>> shape_ = (4, 2, 3)
+        >>> torch.unravel_index(indices, shape_, as_tuple=False)
+        tensor([[0, 1, 0],
+                [1, 1, 1],
+                [2, 0, 0]])
+    """
+
+    def _helper_type_check(inp: Union[int, Sequence, Tensor], name: str):
+        # `indices` is expected to be a tensor, while `shape` can be a sequence/int/tensor
+        if name == "shape" and isinstance(inp, Sequence):
+            for dim in inp:
+                if not isinstance(dim, int):
+                    raise TypeError(
+                        "Expected shape to have only integral elements."
+                    )
+                if dim < 0:
+                    raise ValueError(
+                        "Negative values in shape are not allowed."
+                    )
+        elif name == "shape" and isinstance(inp, int):
+            if inp < 0:
+                raise ValueError("Negative values in shape are not allowed.")
+        elif isinstance(inp, Tensor):
+            if inp.dtype not in integral_types():
+                raise TypeError(
+                    f"Expected {name} to be an integral tensor, but found dtype: {inp.dtype}"
+                )
+            if torch.any(inp < 0):
+                raise ValueError(f"Negative values in {name} are not allowed.")
+        else:
+            allowed_types = (
+                "Sequence/Scalar (int)/Tensor"
+                if name == "shape"
+                else "Sequence/Tensor"
+            )
+            msg = f"{name} should either be a {allowed_types}, but found {type(inp)}"
+            raise TypeError(msg)
+
+    _helper_type_check(indices, "indices")
+    _helper_type_check(shape, "shape")
+
+    # Convert to a tensor, with the same properties as that of indices
+    if isinstance(shape, Sequence):
+        shape_tensor: Tensor = indices.new_tensor(shape)
+    elif isinstance(shape, int) or (
+        isinstance(shape, Tensor) and shape.ndim == 0
+    ):
+        shape_tensor = indices.new_tensor((shape,))
+    else:
+        shape_tensor = shape
+
+    # By this time, shape tensor will have dim = 1 if it was passed as scalar (see if-elif above)
+    assert (
+        shape_tensor.ndim == 1
+    ), f"Expected dimension of shape tensor to be <= 1, \
+    but got the tensor with dim: {shape_tensor.ndim}."
+
+    # In case no indices passed, return an empty tensor with number of elements = shape.numel()
+    if indices.numel() == 0:
+        # If both indices.numel() == 0 and shape.numel() == 0, short-circuit to return itself
+        shape_numel = shape_tensor.numel()
+        if shape_numel == 0:
+            raise ValueError(
+                "Got indices and shape as empty tensors, expected non-empty tensors."
+            )
+        output = [indices.new_tensor([]) for _ in range(shape_numel)]
+        return tuple(output) if as_tuple else torch.stack(output, dim=1)
+
+    if torch.max(indices) >= torch.prod(shape_tensor):
+        raise ValueError("Target shape should cover all source indices.")
+
+    coefs = shape_tensor[1:].flipud().cumprod(dim=0).flipud()
+    coefs = torch.cat((coefs, coefs.new_tensor((1,))), dim=0)
+    coords = (
+        torch.div(indices[..., None], coefs, rounding_mode="trunc")
+        % shape_tensor
+    )
+
+    if as_tuple:
+        return tuple(coords[..., i] for i in range(coords.size(-1)))
+    return coords

@@ -1,23 +1,41 @@
+import functools
+import time
+
 import pytorch_lightning as pl
 import torch
-from clicking.robots import robot_01
 
 
 def get_dataloaders(num_workers=12, batch_size=256):
     from data.datasets.sbd import SBDDataset
     from data.iis_dataset import RegionDataset
     from data.region_selector import random_single
-    from data.transforms import RandomCrop
+    from data.transforms import (
+        RandomCrop,
+        composed_func,
+        fix_mask_shape,
+        to_channel_first,
+        to_channel_last,
+    )
 
     # train data
     seg_dataset = SBDDataset(
         "/home/franchesoni/adisk/iis_datasets/datasets/SBD", split="train"
     )
     region_selector = random_single
-    augmentator = RandomCrop(out_size=(224, 224))
+    augmentator = composed_func(
+        [
+            fix_mask_shape,
+            to_channel_last,
+            RandomCrop(out_size=(224, 224)),
+            to_channel_first,
+        ]
+    )
     iis_dataset = RegionDataset(seg_dataset, region_selector, augmentator)
     train_iis_dataloader = torch.utils.data.DataLoader(
-        iis_dataset, batch_size=batch_size, num_workers=num_workers
+        iis_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=True,
     )
 
     # val data
@@ -25,12 +43,15 @@ def get_dataloaders(num_workers=12, batch_size=256):
         "/home/franchesoni/adisk/iis_datasets/datasets/SBD", split="test"
     )
     val_region_selector = random_single
-    val_augmentator = RandomCrop(out_size=(224, 224))
+    val_augmentator = augmentator
     val_iis_dataset = RegionDataset(
         val_seg_dataset, val_region_selector, val_augmentator
     )
     val_iis_dataloader = torch.utils.data.DataLoader(
-        val_iis_dataset, batch_size=batch_size, num_workers=num_workers
+        val_iis_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=True,
     )
     return train_iis_dataloader, val_iis_dataloader
 
@@ -40,16 +61,29 @@ def get_model(num_workers=4, batch_size=8, hacky=False):
     from engine.metrics import mse
     from models.lightning import LitIIS
     from models.wrappers.iis_smp_wrapper import EarlySMP
+    from clicking.encode import encode_disks_from_scratch
+    from clicking.robots import robot_02
+    from engine.metrics import eval_metrics
 
     lit_model = LitIIS(
         mse,
-        robot_01,
+        robot_02,
         EarlySMP,
-        iis_model_args_list=[
-            smp.Unet,
-            {"encoder_name": "mobilenet_v2", "encoder_weights": "imagenet"},
-        ],
-        iis_model_kwargs_dict={"in_channels": 6},
+        iis_model_kwargs_dict={
+            "smp_model_class": smp.Unet,
+            "smp_model_kwargs_dict": {
+                "encoder_name": "mobilenet_v2",
+                "encoder_weights": "imagenet",
+            },
+            "click_encoder": encode_disks_from_scratch,
+            "in_channels": 6,
+        },
+        training_metrics=functools.partial(
+            eval_metrics,
+            num_classes=1,
+            ignore_index=0,
+            metrics=["mIoU", "mDice", "mFscore"],
+        ),
     )
     if hacky:
         # hacky way to be able to tune the lr and batch size
@@ -65,9 +99,10 @@ def get_model(num_workers=4, batch_size=8, hacky=False):
 
 
 if __name__ == "__main__":
+    st = time.time()
     seed = 0
     tune = False
-    num_workers, batch_size = 6, 24
+    num_workers, batch_size = 6, 64
 
     pl.seed_everything(seed)
     if tune:
@@ -84,23 +119,26 @@ if __name__ == "__main__":
 
     trainer = pl.Trainer(
         # training options
-        # gpus=1,
-        # precision=16,
-        max_epochs=1000,
+        gpus=1,
+        precision=16,
+        max_epochs=100,  # 0,
         # my options
         log_every_n_steps=1,
         deterministic=True,
         benchmark=False,
-        # optimization options
-        auto_scale_batch_size="binsearch",
-        auto_lr_find=True,
+        # # optimization options
+        # auto_scale_batch_size="binsearch",
+        # auto_lr_find=True,
         # debugging options:
         # callbacks=[pl.callbacks.DeviceStatsMonitor()],
         profiler="simple",
         # profiler=pl.profiler.AdvancedProfiler(filename='profile_report.txt'),
         fast_dev_run=True,
-        # overfit_batches=10,
+        # overfit_batches=1,
     )
+    print("Finished setup")
+    print(f"Set up time: {time.time() - st}")
+    print("=" * 40)
 
     if tune:
         trainer.tune(model)

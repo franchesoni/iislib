@@ -1,3 +1,6 @@
+from typing import Callable
+from typing import Union
+
 import pytorch_lightning as pl
 import torch
 from engine.training_logic import interact
@@ -14,10 +17,11 @@ class LitIIS(pl.LightningModule):
         training_metrics=None,
         validation_metrics=None,
         interaction_steps=3,
-        lr=0.0001,
+        lr=0.01,
     ):
         super().__init__()
         self.save_hyperparameters()
+        # define generic model
         iis_model_args_list = iis_model_args_list or []
         iis_model_kwargs_dict = iis_model_kwargs_dict or {}
         self.model = iis_model_cls(
@@ -26,20 +30,64 @@ class LitIIS(pl.LightningModule):
         self.loss_fn = loss_fn
         self.robot_click = robot_click
         self.training_metrics = training_metrics or {}
-        self.validation_metrics = (
-            validation_metrics if len(validation_metrics) else training_metrics
-        )
+        self.validation_metrics = validation_metrics or training_metrics
         self.interaction_steps = interaction_steps
         self.lr = lr
 
     def forward(self, x, z, pcs, ncs):
         return self.model(x, z, pcs, ncs)
 
+    def log_metrics(
+        self,
+        y: torch.Tensor,
+        target: torch.Tensor,
+        metrics: Union[Callable, dict],
+        prefix: str = "",
+        name: str = "",
+    ):
+        """Logs metrics computed over `y` and `target` with flexibility.
+
+        Args:
+            y (torch.Tensor): predicted mask, (B, 1, H, W)
+            target (torch.Tensor): target, (B, 1, H, W)
+            metrics (Union[Callable, dict]):
+                one of:
+                - dict of key:values to log
+                - dict of functions, key:function(y, target) is logged
+                - function that returns a dict and logs its key:values
+            prefix (str, optional): something to append to the name. Defaults to ''.
+            name (str, optional): something to prepend to the metric name. Defaults to ''.
+
+        Raises:
+            ValueError: if `metrics` is not on the scenarios above
+        """
+        if isinstance(metrics, dict):
+            for metric_name in metrics:
+                if callable(metric := metrics[metric_name]):
+                    # if its a function, compute and log the results
+                    self.log_metrics(
+                        y, target, metric, prefix=prefix, name=metric_name
+                    )
+                else:  # assume a value and log it
+                    self.log(
+                        "_".join([prefix, name, metric_name]), float(metric)
+                    )
+        elif callable(metrics):
+            if isinstance(computed_metrics := metrics(y, target), dict):
+                # assume a dict of results
+                self.log_metrics(
+                    None, None, computed_metrics, prefix=prefix, name=name
+                )
+            else:  # just a value
+                self.log("_".join([prefix, name]), float(computed_metrics))
+        elif metrics is not None:  # metrics=None ignores everyghin
+            raise ValueError("`metrics` should be a function or a dict")
+
     def training_step(self, batch, batch_idx):
         y, z, pcs, ncs = interact(
             self.model,
-            self.init_z,
-            self.init_y,
+            self.model.init_z,
+            self.model.init_y,
             self.robot_click,
             batch,
             self.interaction_steps,
@@ -48,21 +96,18 @@ class LitIIS(pl.LightningModule):
             batch_idx=batch_idx,
         )
         target = batch["mask"]
-        loss = self.loss_fn(
-            y.squeeze(), target.squeeze()
-        )  # get dimensions right
-        self.log("train_loss", loss)
-        for metric_name in self.training_metrics:
-            self.log(
-                metric_name, self.training_metrics[metric_name](y, target)
-            )
+        loss = self.loss_fn(y, target)
+        self.log("train_loss", loss)  # lightning
+        self.log_metrics(
+            y.detach(), target.detach(), self.training_metrics, prefix="train"
+        )  # custom
         return loss
 
     def validation_step(self, batch, batch_idx):
         y, z, pcs, ncs = interact(
             self.model,
-            self.init_z,
-            self.init_y,
+            self.model.init_z,
+            self.model.init_y,
             self.robot_click,
             batch,
             self.interaction_steps,
@@ -71,15 +116,11 @@ class LitIIS(pl.LightningModule):
             batch_idx=batch_idx,
         )
         target = batch["mask"]
-        loss = self.loss_fn(
-            y.squeeze(), target.squeeze()
-        )  # get dimensions right
-        self.log("val_loss", loss)
-        for metric_name in self.validation_metrics:
-            self.log(
-                metric_name,
-                self.validation_metrics[metric_name](y, target),
-            )
+        loss = self.loss_fn(y, target)
+        self.log("val_loss", loss)  # lightning
+        self.log_metrics(
+            y, target, self.training_metrics, prefix="val"
+        )  # custom
         return loss
 
     def configure_optimizers(self):

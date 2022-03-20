@@ -131,7 +131,7 @@ def encode_disks_last_clicks(
 def encode_disks_from_scratch(
     pcs: list[list[list[Point]]],
     ncs: list[list[list[Point]]],
-    pos_encoding: list[torch.Tensor],
+    pos_encoding: list[torch.Tensor],  # these define the shape
     neg_encoding: list[torch.Tensor],
     radius: int = 5,
 ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
