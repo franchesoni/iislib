@@ -1,9 +1,11 @@
 """
 Robot clicking is defined in this script.
 There are robots in increasing complexity level:
+implemented:
 - robot_01 : randomly samples and sets pos/neg according to target only
 - robot_02 : randomly samples from false region only
 - robot_03 : randomly samples from largest false region only
+to implement:
 - robot_04 : randomly samples from largest false region considering
 previous clicks
 - robot_05 : distance map sampling considering previous clicks
@@ -18,6 +20,7 @@ All the robots 0x do
 - Add these points to the previous list
 - Encodes the clicks if an encoder is passed needed
 """
+from typing import Callable
 from typing import Union
 
 import torch
@@ -33,6 +36,22 @@ Point = Union[list[int], torch.Tensor]
 Clicks = list[
     list[list[Point]]
 ]  # axes : (interaction, batch_element, click_number)
+
+
+def build_robot_mix(
+    list_of_robots: list[Callable], robots_weights: list[float]
+):
+    assert len(list_of_robots) == len(robots_weights)
+    sw = sum(robots_weights)
+    robots_weights = torch.tensor(
+        [w / sw for w in robots_weights]
+    )  # make probability dist
+
+    def robot_mix(*args, **kwargs):
+        robot_ind = torch.multinomial(robots_weights, 1)
+        return list_of_robots[robot_ind](*args, **kwargs)
+
+    return robot_mix
 
 
 def robot_01(
@@ -135,7 +154,7 @@ def robot_03(
     false_masks = torch.logical_xor(pred_masks, targets)
     largest_false_masks = torch.stack(
         [
-            torch.from_numpy(get_largest_region(false_mask))
+            torch.from_numpy(get_largest_region(false_mask.cpu()))
             for false_mask in false_masks
         ]
     )  # done one cpu :sad:

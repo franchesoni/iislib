@@ -12,6 +12,9 @@ def interact(
     clicks_per_step=1,
     batch_idx=None,
 ):
+    assert bool(interaction_steps) != bool(
+        max_interactions
+    ), "deterministic or max, can't be both"
     if interaction_steps is None:
         assert (
             max_interactions

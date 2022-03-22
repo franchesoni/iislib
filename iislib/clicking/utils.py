@@ -45,7 +45,7 @@ def get_largest_incorrect_region(alpha, gt):
     return largest_incorrect, largest_incorrect_cat
 
 
-def get_largest_region(mask: Union[torch.Tensor, np.ndarray]) -> np.ndarray:
+def get_largest_region(mask: np.ndarray) -> np.ndarray:
     labels = skimage.morphology.label(mask, connectivity=1)
     label_unique, counts = np.unique(labels[labels != 0], return_counts=True)
     return 1 * (labels == label_unique[np.argmax(counts)])

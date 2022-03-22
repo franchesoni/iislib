@@ -1,4 +1,6 @@
 import functools
+import os  # optional: for extracting basename / creating new filepath
+import shutil
 import time
 
 import pytorch_lightning as pl
@@ -60,23 +62,25 @@ def get_model(num_workers=4, batch_size=8, hacky=False):
     import segmentation_models_pytorch as smp
     from engine.metrics import mse
     from models.lightning import LitIIS
-    from models.wrappers.iis_smp_wrapper import EarlySMP
+    from models.wrappers.iis_smp_wrapper import EarlySMP, EncodeSMP
     from clicking.encode import encode_disks_from_scratch
-    from clicking.robots import robot_02
+    from clicking.robots import build_robot_mix, robot_01, robot_02, robot_03
     from engine.metrics import eval_metrics
 
     lit_model = LitIIS(
         mse,
-        robot_02,
-        EarlySMP,
+        build_robot_mix([robot_01, robot_02, robot_03], [3, 6, 1]),
+        # EarlySMP,
+        EncodeSMP,
         iis_model_kwargs_dict={
             "smp_model_class": smp.Unet,
             "smp_model_kwargs_dict": {
+                # "encoder_name": "dpn68b",
+                # "encoder_weights": "imagenet+5k",
                 "encoder_name": "mobilenet_v2",
                 "encoder_weights": "imagenet",
             },
             "click_encoder": encode_disks_from_scratch,
-            "in_channels": 6,
         },
         training_metrics=functools.partial(
             eval_metrics,
@@ -84,6 +88,7 @@ def get_model(num_workers=4, batch_size=8, hacky=False):
             ignore_index=0,
             metrics=["mIoU", "mDice", "mFscore"],
         ),
+        max_interactions=4,
     )
     if hacky:
         # hacky way to be able to tune the lr and batch size
@@ -102,7 +107,8 @@ if __name__ == "__main__":
     st = time.time()
     seed = 0
     tune = False
-    num_workers, batch_size = 6, 64
+    # num_workers, batch_size = 6, 128
+    num_workers, batch_size = 4, 16
 
     pl.seed_everything(seed)
     if tune:
@@ -117,11 +123,24 @@ if __name__ == "__main__":
             num_workers=num_workers, batch_size=batch_size, hacky=False
         )
 
+    class SaveScriptCallback(pl.callbacks.Callback):
+        def on_train_start(self, trainer, pl_module):
+            if log_dir := trainer.log_dir:
+                copied_script_name = (
+                    time.strftime("%Y-%m-%d_%H%M")
+                    + "_"
+                    + os.path.basename(__file__)
+                )
+                shutil.copy(
+                    __file__, os.path.join(log_dir, copied_script_name)
+                )
+
     trainer = pl.Trainer(
         # training options
+        default_root_dir="../results",
         gpus=1,
         precision=16,
-        max_epochs=100,  # 0,
+        # max_epochs=1000,  # if commented, run forever
         # my options
         log_every_n_steps=1,
         deterministic=True,
@@ -130,15 +149,18 @@ if __name__ == "__main__":
         # auto_scale_batch_size="binsearch",
         # auto_lr_find=True,
         # debugging options:
-        # callbacks=[pl.callbacks.DeviceStatsMonitor()],
+        callbacks=[
+            SaveScriptCallback()
+        ],  # pl.callbacks.DeviceStatsMonitor()],
         profiler="simple",
         # profiler=pl.profiler.AdvancedProfiler(filename='profile_report.txt'),
-        fast_dev_run=True,
+        # fast_dev_run=True,
         # overfit_batches=1,
     )
     print("Finished setup")
     print(f"Set up time: {time.time() - st}")
     print("=" * 40)
+    print("Start training")
 
     if tune:
         trainer.tune(model)

@@ -16,7 +16,8 @@ class LitIIS(pl.LightningModule):
         iis_model_kwargs_dict=None,
         training_metrics=None,
         validation_metrics=None,
-        interaction_steps=3,
+        interaction_steps=None,
+        max_interactions=4,
         lr=0.01,
     ):
         super().__init__()
@@ -32,6 +33,7 @@ class LitIIS(pl.LightningModule):
         self.training_metrics = training_metrics or {}
         self.validation_metrics = validation_metrics or training_metrics
         self.interaction_steps = interaction_steps
+        self.max_interactions = max_interactions
         self.lr = lr
 
     def forward(self, x, z, pcs, ncs):
@@ -90,8 +92,8 @@ class LitIIS(pl.LightningModule):
             self.model.init_y,
             self.robot_click,
             batch,
-            self.interaction_steps,
-            max_interactions=None,
+            interaction_steps=self.interaction_steps,
+            max_interactions=self.max_interactions,
             clicks_per_step=2,
             batch_idx=batch_idx,
         )
@@ -110,8 +112,8 @@ class LitIIS(pl.LightningModule):
             self.model.init_y,
             self.robot_click,
             batch,
-            self.interaction_steps,
-            max_interactions=None,
+            interaction_steps=self.interaction_steps or self.max_interactions,
+            max_interactions=None,  # no randomness involved when validating
             clicks_per_step=2,
             batch_idx=batch_idx,
         )
