@@ -1,3 +1,5 @@
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -31,10 +33,21 @@ def plot_model_res(model_res, model_names):
 
 
 if __name__ == "__main__":
+    res_dir = "/home/franchesoni/iis/iislib/results/benchmark/"
+    prefix = "mar24_"
     model_res = {}
     model_names = ["ours", "ritm", "gto99"]
+    robot_prefixes = ["r01_", "r02_", "r03_"]
     for model_name in model_names:
-        res = np.load(f"scores_{model_name}.npy", allow_pickle=True)
-        model_res[model_name] = get_res_by_key(res)
+        for robot_prefix in robot_prefixes:
+            res = np.load(
+                os.path.join(
+                    res_dir, f"scores_{prefix}{robot_prefix}{model_name}.npy"
+                ),
+                allow_pickle=True,
+            )
+            model_res[robot_prefix + model_name] = get_res_by_key(res)
 
-    plot_model_res(model_res, model_names)
+    plot_model_res(
+        model_res, [r + n for r in robot_prefixes for n in model_names]
+    )

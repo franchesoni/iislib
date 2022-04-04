@@ -1,5 +1,5 @@
 import torch
-from clicking.utils import norm_fn
+from data.transforms import norm_fn
 from models.custom.ritm.isegm.inference import utils
 
 
@@ -49,20 +49,21 @@ def predict(model, image, prev_mask, pcs, ncs):
         points.append([])
         for n_interaction in range(len(pcs)):  # for each interaction
             for click in pcs[n_interaction][n_element]:
-                if click == -1:
-                    points[-1].append([-1, -1, -1])  # add all positive clicks
-                else:
+                if (click == -1) is not True:
                     points[-1].append(
                         [click[0], click[1], n_interaction]
                     )  # add all positive clicks
+                else:
+                    points[-1].append([-1, -1, -1])  # add all positive clicks
+
         for n_interaction in range(len(ncs)):
             for click in ncs[n_interaction][n_element]:
-                if click == -1:
-                    points[-1].append([-1, -1, -1])  # add all positive clicks
-                else:
+                if (click == -1) is not True:
                     points[-1].append(
                         [click[0], click[1], n_interaction]
                     )  # add all negative clicks
+                else:
+                    points[-1].append([-1, -1, -1])  # add all positive clicks
 
     input_image = torch.cat((image, prev_mask), dim=1)
     pred_logits = model.forward(input_image, torch.Tensor(points))["instances"]
@@ -86,7 +87,7 @@ def initialize_y(image, target):
 
 
 # define model here
-checkpoint = "/home/franchesoni/iis/iis_framework/models/custom/ritm/sbd_h18_itermask.pth"
+checkpoint = "/home/franchesoni/iis/iislib/iislib/models/custom/ritm/sbd_h18_itermask.pth"
 model = utils.load_is_model(checkpoint, device="cpu")
 
 

@@ -1,10 +1,15 @@
 import functools
+import glob
 import os
+import sys
+from pathlib import Path
 
 import numpy as np
 import pytorch_lightning as pl
 import torch
 import torchvision.transforms
+from clicking.robots import robot_01
+from clicking.robots import robot_02
 from clicking.robots import robot_03
 from data.iis_dataset import EvaluationDataset
 from data.transforms import norm_fn
@@ -12,12 +17,8 @@ from engine.metrics import eval_metrics
 from torchvision.transforms.functional import center_crop
 from torchvision.transforms.functional import resize
 
-# from clicking.robots import robot_01
-# from clicking.robots import robot_02
-
-# import sys
-# sys.path.append("/home/franchesoni/iis/iislib/tests/")
-# from visualization import visualize_on_test
+sys.path.append("/home/franchesoni/iis/iislib/tests/")
+from visualization import visualize_on_test
 
 
 """Testing of any method
@@ -41,17 +42,19 @@ def to_np(img):
     return out
 
 
-def get_model():
-    raise NotImplementedError
-    # from models.lightning import LitIIS
+def get_model(version="last"):
+    from models.lightning import LitIIS
 
-    # logs_dir = Path(__file__).parent / "lightning_logs/"
-    # versions = [vname for vname in os.listdir(logs_dir)]
-    # last_version = max(int(vname.split("_")[-1]) for vname in versions)
-    # checkpoint_path = glob.glob(
-    #     str(logs_dir / f"version_{last_version}" / "checkpoints") + "/*"
-    # )[0]
-    # model = LitIIS.load_from_checkpoint(checkpoint_path)
+    results_dir = "/home/franchesoni/iis/iislib/results"
+    logs_dir = Path(results_dir) / "lightning_logs/"
+    versions = [vname for vname in os.listdir(logs_dir)]
+    if version == "last":
+        version = max(int(vname.split("_")[-1]) for vname in versions)
+    checkpoint_path = glob.glob(
+        str(logs_dir / f"version_{version}" / "checkpoints") + "/*"
+    )[0]
+    model = LitIIS.load_from_checkpoint(checkpoint_path, robot_click=None)
+    return model.model, model.model.init_z, model.model.init_y
     # encoding_fn = encode_disks
 
     # def fwd_lit_iis(image, z, pcs, ncs):
@@ -139,11 +142,15 @@ def get_dataset():
 
 
 def test():
+    exp_prefix = "mar24_"
+    # model_names = ['gto99', 'ritm', 'ours']
+    model_names = ["ours_early"]
+    robots = [robot_01, robot_02, robot_03]
+    robot_prefix = ["r01_", "r02_", "r03_"]
+
     seed = 0
-    model_name = "gto99"
-    prefix = "3_"
-    destdir = "/home/franchesoni/iis/iislib/results/tmp"
     max_n_clicks = 20
+    destdir = "/home/franchesoni/iis/iislib/results/benchmark"
     compute_scores = functools.partial(
         eval_metrics,
         num_classes=1,
@@ -151,47 +158,59 @@ def test():
         metrics=["mIoU", "mDice", "mFscore"],
     )
 
-    robot = robot_03
-    if model_name == "ritm":
-        model, init_z, init_y = get_model_ritm()
-    elif model_name == "gto99":
-        model, init_z, init_y = get_model_gto99()
-    elif model_name == "ours":
-        model, init_z, init_y = get_model()
-    ds = get_dataset()
-    pl.seed_everything(seed)
-    dl = torch.utils.data.DataLoader(ds, batch_size=1)
-    scores = []
+    for model_name in model_names:
+        for robot_ind, robot in enumerate(robots):
+            prefix = exp_prefix + robot_prefix[robot_ind]
 
-    for bi, batch in enumerate(dl):
-        image, target = batch["image"], batch["mask"]  # (B, C, H, W)
+            if model_name == "ritm":
+                model, init_z, init_y = get_model_ritm()
+            elif model_name == "gto99":
+                model, init_z, init_y = get_model_gto99()
+            elif model_name == "ours":
+                model, init_z, init_y = get_model()
+            elif model_name == "ours_early":
+                model, init_z, init_y = get_model("35")
+            ds = get_dataset()
+            pl.seed_everything(seed)
+            dl = torch.utils.data.DataLoader(ds, batch_size=1)
+            scores = []
 
-        z = init_z(image, target)
-        y = init_y(image, target)  # (B, 1, H, W)
-        pcs, ncs = [], []  # two click_seq
-        scores.append([])
+            for bi, batch in enumerate(dl):
+                image, target = (
+                    batch["image"].float(),
+                    batch["mask"].float(),
+                )  # (B, C, H, W)
 
-        for iter_ind in range(max_n_clicks):
-            pcs, ncs = robot(y, target, n_points=1, pcs=pcs, ncs=ncs)
-            y, z = model(image, z, pcs, ncs)  # (B, 1, H, W), z
-            # visualize_on_test(
-            #     to_np(image[0]),
-            #     np.array(target[0][0]),
-            #     output=np.array(y[0][0].detach()),
-            #     pcs=pcs,
-            #     ncs=ncs,
-            #     name=f"{prefix}{model_name}_{bi}_{iter_ind}",
-            #     destdir=destdir,
-            # )
+                z = init_z(image, target)
+                y = init_y(image, target)  # (B, 1, H, W)
+                pcs, ncs = [], []  # two click_seq
+                scores.append([])
 
-            ss = compute_scores(
-                1 * (0.5 < norm_fn(y)),
-                norm_fn(target),
+                for iter_ind in range(max_n_clicks):
+                    pcs, ncs = robot(y, target, n_points=1, pcs=pcs, ncs=ncs)
+                    y, z = model(image, z, pcs, ncs)  # (B, 1, H, W), z
+                    if bi < 3:
+                        visualize_on_test(
+                            to_np(image[0]),
+                            np.array(target[0][0]),
+                            output=np.array(y[0][0].detach()),
+                            pcs=pcs,
+                            ncs=ncs,
+                            name=f"{prefix}{model_name}_{str(bi).zfill(2)}_{str(iter_ind).zfill(2)}",
+                            destdir=destdir,
+                        )
+
+                    ss = compute_scores(
+                        1 * (0.5 < norm_fn(y)),
+                        norm_fn(target),
+                    )
+                    scores[-1].append(ss)
+                    print(f"done with batch {bi} click {iter_ind}, score={ss}")
+
+            np.save(
+                os.path.join(destdir, f"scores_{prefix}{model_name}.npy"),
+                scores,
             )
-            scores[-1].append(ss)
-            print(f"done with batch {bi} click {iter_ind}, score={ss}")
-
-    np.save(os.path.join(destdir, f"scores_{prefix}{model_name}.npy"), scores)
 
 
 if __name__ == "__main__":
