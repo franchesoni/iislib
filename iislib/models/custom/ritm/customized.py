@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import torch
 from data.transforms import norm_fn
 from models.custom.ritm.isegm.inference import utils
@@ -87,7 +89,7 @@ def initialize_y(image, target):
 
 
 # define model here
-checkpoint = "/home/franchesoni/iis/iislib/iislib/models/custom/ritm/sbd_h18_itermask.pth"
+checkpoint = Path(__file__).parent / 'sbd_h18_itermask.pth'
 model = utils.load_is_model(checkpoint, device="cpu")
 
 
