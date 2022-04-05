@@ -402,8 +402,9 @@ def build_model(args):
 
     model = MattingModuleSingleGpu(net_encoder, net_decoder)
 
-    model.cuda()
+    if torch.cuda.is_available():
+        model.cuda()
 
-    sd = torch.load(args.weights)
+    sd = torch.load(args.weights, map_location='cpu')
     model.load_state_dict(sd, strict=True)
     return model
