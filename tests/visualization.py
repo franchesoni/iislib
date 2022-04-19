@@ -22,6 +22,8 @@ def visualize_on_test(
         + (1 * (0.5 < norm_fn(output)))[:, :, None] * mask_color * alpha
     )  # add inverted mean-color mask
 
+    plt.figure(figsize=(4, 4))
+
     plt.subplot(221)
     plt.imshow(image)
     plt.grid()
@@ -82,6 +84,8 @@ def visualize_on_test(
                 )
     plt.grid()
     plt.axis("off")
+
+    plt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
 
     if destdir is None:
         plt.savefig(name + ".png")

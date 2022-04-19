@@ -6,10 +6,9 @@ implemented:
 - robot_02 : randomly samples from false region only
 - robot_03 : randomly samples from largest false region only
 to implement:
-- robot_04 : randomly samples from largest false region considering
-previous clicks
+- robot_04 : distance map sampling
 - robot_05 : distance map sampling considering previous clicks
-- robot_99 : center sampling largest false region considering previous
+- robot_gto99 : center sampling largest false region considering previous
 clicks as in 99% paper
 - robot_ritm : sampling as in RITM paper
 
@@ -24,9 +23,14 @@ from typing import Callable
 from typing import Union
 
 import torch
+from clicking.utils import get_d_prob_map
 from clicking.utils import get_largest_region
 from clicking.utils import output_target_are_B1HW_in_01
 from clicking.utils import sample_points_torch
+from models.custom.gto99.interaction import click_position
+from models.custom.gto99.interaction import get_largest_incorrect_region
+from models.custom.ritm.isegm.inference.clicker import Click
+from models.custom.ritm.isegm.inference.clicker import Clicker
 
 # import sys
 # sys.path.append("/home/franchesoni/iis/iislib/tests/")
@@ -183,6 +187,216 @@ def robot_03(
         _ncs
     )  # (interaction, batch, click) or list of list of list of Points
     return pcs, ncs
+
+
+def robot_04(
+    outputs: torch.Tensor,  # (B, C, H, W), C=1, contained in [0, 1] (interval)
+    targets: torch.Tensor,  # (B, C, H, W), C=1, contained in {0, 1} (set)
+    pcs: Clicks,  # indexed by (interaction, batch_element, click)
+    ncs: Clicks,
+    n_points: int = 1,
+    thresh=0.5,
+) -> tuple[Clicks, Clicks]:
+    """
+    Adds n_points into the lists `pcs` and `ncs`
+    """
+    assert output_target_are_B1HW_in_01(outputs, targets)
+    pred_masks = 1 * (thresh < outputs)
+    false_masks = torch.logical_xor(pred_masks, targets)
+    prob_maps = torch.stack(
+        [
+            torch.from_numpy(
+                get_d_prob_map(false_mask[0].cpu().numpy(), hard_thresh=0)
+            )[None, ...]
+            for false_mask in false_masks
+        ]
+    )
+    clicks = [
+        sample_points_torch(prob_map, n_points) for prob_map in prob_maps
+    ]
+
+    is_positive = [
+        [targets[b, :, i, j] == 1 for i, j in clicks[b]]
+        for b in range(len(clicks))
+    ]  # a bool per click
+    _pcs, _ncs = [], []  # (batch element, click)
+    for b in range(len(targets)):  # add the clicks for each image in the batch
+        _pcs.append([])
+        _ncs.append([])
+        for ind_click, click in enumerate(clicks[b]):
+            if is_positive[b][ind_click]:
+                _pcs[-1].append(click)
+            else:
+                _ncs[-1].append(click)
+    pcs.append(_pcs)  # nested list indexed as follows:
+    ncs.append(
+        _ncs
+    )  # (interaction, batch, click) or list of list of list of Points
+    return pcs, ncs
+
+
+def robot_05(
+    outputs: torch.Tensor,  # (B, C, H, W), C=1, contained in [0, 1] (interval)
+    targets: torch.Tensor,  # (B, C, H, W), C=1, contained in {0, 1} (set)
+    pcs: Clicks,  # indexed by (interaction, batch_element, click)
+    ncs: Clicks,
+    n_points: int = 1,
+    thresh=0.5,
+) -> tuple[Clicks, Clicks]:
+    """
+    Adds n_points into the lists `pcs` and `ncs`
+    Randomly samples from largest false region.
+    implementation: detect largest false region and sample randomly from inside each one direclty
+    """
+    assert output_target_are_B1HW_in_01(outputs, targets)
+    pred_masks = 1 * (thresh < outputs)
+    false_masks = torch.logical_xor(pred_masks, targets)
+    clicks = [[]] * len(false_masks)
+
+    for _ in range(n_points):  # create n points
+        prob_maps = torch.stack(
+            [
+                torch.from_numpy(
+                    get_d_prob_map(false_mask[0].cpu().numpy(), hard_thresh=0)
+                )[None, ...]
+                for false_mask in false_masks
+            ]  # false_mask and prob_map are both (1, H, W)
+        )
+        for ind, prob_map in enumerate(prob_maps):
+            click = sample_points_torch(prob_map, 1)[0]
+            assert len(click) == 2
+            false_masks[ind][0, click[0], click[1]] = 0  # background
+            clicks[ind].append(click)
+    clicks = [torch.stack(click_list) for click_list in clicks]
+
+    is_positive = [
+        [targets[b, :, i, j] == 1 for i, j in clicks[b]]
+        for b in range(len(clicks))
+    ]  # a bool per click
+    _pcs, _ncs = [], []  # (batch element, click)
+    for b in range(len(targets)):  # add the clicks for each image in the batch
+        _pcs.append([])
+        _ncs.append([])
+        for ind_click, click in enumerate(clicks[b]):
+            if is_positive[b][ind_click]:
+                _pcs[-1].append(click)
+            else:
+                _ncs[-1].append(click)
+    pcs.append(_pcs)  # nested list indexed as follows:
+    ncs.append(
+        _ncs
+    )  # (interaction, batch, click) or list of list of list of Points
+    return pcs, ncs
+
+
+def robot_gto99(
+    outputs: torch.Tensor,  # (B, C, H, W), C=1, contained in [0, 1] (interval)
+    targets: torch.Tensor,  # (B, C, H, W), C=1, contained in {0, 1} (set)
+    pcs: Clicks,  # indexed by (interaction, batch_element, click)
+    ncs: Clicks,
+    n_points: int = 1,
+    thresh=0.5,
+) -> tuple[Clicks, Clicks]:
+    """
+    Adds n_points into the lists `pcs` and `ncs`
+    Randomly samples from largest false region.
+    implementation: detect largest false region and sample randomly from inside each one direclty
+    """
+    assert output_target_are_B1HW_in_01(outputs, targets)
+    assert n_points == 1, "For getting to 99 paper we use only one click"
+    pred_masks = 1 * (thresh < outputs)
+    false_masks = torch.logical_xor(pred_masks, targets)
+    clicks = [None] * len(false_masks)
+    for ind, pred_mask in enumerate(pred_masks):
+        target = targets[ind]
+        incorrect_region, click_cat = get_largest_incorrect_region(
+            pred_mask[0].cpu().numpy(), target[0].cpu().numpy()
+        )
+        y, x = click_position(incorrect_region, clicks_cat=None)
+        clicks[ind] = torch.Tensor(
+            [[y, x]]
+        ).long()  # we need this because they are indices
+
+    is_positive = [
+        [targets[b, :, i, j] == 1 for i, j in clicks[b]]
+        for b in range(len(clicks))
+    ]  # a bool per click
+    _pcs, _ncs = [], []  # (batch element, click)
+    for b in range(len(targets)):  # add the clicks for each image in the batch
+        _pcs.append([])
+        _ncs.append([])
+        for ind_click, click in enumerate(clicks[b]):
+            if is_positive[b][ind_click]:
+                _pcs[-1].append(click)
+            else:
+                _ncs[-1].append(click)
+    pcs.append(_pcs)  # nested list indexed as follows:
+    ncs.append(
+        _ncs
+    )  # (interaction, batch, click) or list of list of list of Points
+    return pcs, ncs
+
+
+def robot_ritm(
+    outputs: torch.Tensor,  # (B, C, H, W), C=1, contained in [0, 1] (interval)
+    targets: torch.Tensor,  # (B, C, H, W), C=1, contained in {0, 1} (set)
+    pcs: Clicks,  # indexed by (interaction, batch_element, click)
+    ncs: Clicks,
+    n_points: int = 1,
+    thresh=0.5,
+) -> tuple[Clicks, Clicks]:
+    """
+    Adds n_points into the lists `pcs` and `ncs`
+    Randomly samples from largest false region.
+    implementation: detect largest false region and sample randomly from inside each one direclty
+    """
+    assert output_target_are_B1HW_in_01(outputs, targets)
+    assert n_points == 1, "For ritm paper clicker we use only one click"
+    pred_masks = 1 * (thresh < outputs)
+    clicks = [None] * len(targets)  # along batch
+    for ind, pred_mask in enumerate(pred_masks):  # along batch
+        target = (
+            targets[ind][0].cpu().numpy().astype("int32")
+        )  # no channel, int32 binary mask
+        init_clicks = []
+        for interaction_ind in range(len(pcs)):  # along interactions
+            if 0 < len(pcs[interaction_ind][ind]) and isinstance(
+                pcs[interaction_ind][ind][0], torch.Tensor
+            ):
+                click = Click(
+                    is_positive=True, coords=pcs[interaction_ind][ind][0]
+                )
+            else:
+                click = Click(
+                    is_positive=False, coords=ncs[interaction_ind][ind][0]
+                )
+            init_clicks.append(click)
+        clicker = Clicker(gt_mask=target, init_clicks=init_clicks)
+        clicker.make_next_click(pred_mask[0].cpu().numpy())
+        new_click = clicker.get_clicks()[-1]
+        clicks[ind] = torch.Tensor([new_click.coords]).long()
+
+    is_positive = [
+        [targets[b, :, i, j] == 1 for i, j in clicks[b]]
+        for b in range(len(clicks))
+    ]  # a bool per click
+    _pcs, _ncs = [], []  # (batch element, click)
+    for b in range(len(targets)):  # add the clicks for each image in the batch
+        _pcs.append([])
+        _ncs.append([])
+        for ind_click, click in enumerate(clicks[b]):
+            if is_positive[b][ind_click]:
+                _pcs[-1].append(click)
+            else:
+                _ncs[-1].append(click)
+    pcs.append(_pcs)  # nested list indexed as follows:
+    ncs.append(
+        _ncs
+    )  # (interaction, batch, click) or list of list of list of Points
+    return pcs, ncs
+
+
+###########################################################################
 
 
 # def get_next_points_1(

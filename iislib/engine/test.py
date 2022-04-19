@@ -8,9 +8,14 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 import torchvision.transforms
+import tqdm
 from clicking.robots import robot_01
 from clicking.robots import robot_02
 from clicking.robots import robot_03
+from clicking.robots import robot_04
+from clicking.robots import robot_05
+from clicking.robots import robot_gto99
+from clicking.robots import robot_ritm
 from data.iis_dataset import EvaluationDataset
 from data.transforms import norm_fn
 from engine.metrics import eval_metrics
@@ -142,15 +147,31 @@ def get_dataset():
 
 
 def test():
-    exp_prefix = "mar24_"
-    # model_names = ['gto99', 'ritm', 'ours']
-    model_names = ["ours_early"]
-    robots = [robot_01, robot_02, robot_03]
-    robot_prefix = ["r01_", "r02_", "r03_"]
+    only_one_image = False
+    exp_prefix = "all_robots_"
+    model_names = ["gto99", "ritm"]
+    robots = [
+        robot_01,
+        robot_02,
+        robot_03,
+        robot_04,
+        robot_05,
+        robot_gto99,
+        robot_ritm,
+    ]
+    robot_prefix = [
+        "r01_",
+        "r02_",
+        "r03_",
+        "r04_",
+        "r05_",
+        "rgto99_",
+        "rritm_",
+    ]
 
     seed = 0
     max_n_clicks = 20
-    destdir = "/home/franchesoni/iis/iislib/results/benchmark"
+    destdir = "/home/franchesoni/iis/iislib/results/tmp"
     compute_scores = functools.partial(
         eval_metrics,
         num_classes=1,
@@ -175,7 +196,7 @@ def test():
             dl = torch.utils.data.DataLoader(ds, batch_size=1)
             scores = []
 
-            for bi, batch in enumerate(dl):
+            for bi, batch in tqdm.tqdm(enumerate(dl)):
                 image, target = (
                     batch["image"].float(),
                     batch["mask"].float(),
@@ -186,9 +207,11 @@ def test():
                 pcs, ncs = [], []  # two click_seq
                 scores.append([])
 
-                for iter_ind in range(max_n_clicks):
+                for iter_ind in tqdm.tqdm(range(max_n_clicks), leave=False):
                     pcs, ncs = robot(y, target, n_points=1, pcs=pcs, ncs=ncs)
-                    y, z = model(image, z, pcs, ncs)  # (B, 1, H, W), z
+                    y, z = model(
+                        image, z, pcs, ncs
+                    )  # (B, 1, H, W), z. empty entries in pcs or ncs are replaced by -1
                     if bi < 3:
                         visualize_on_test(
                             to_np(image[0]),
@@ -205,7 +228,10 @@ def test():
                         norm_fn(target),
                     )
                     scores[-1].append(ss)
-                    print(f"done with batch {bi} click {iter_ind}, score={ss}")
+                    # print(f"done with batch {bi} click {iter_ind}, score={ss}")
+
+                if only_one_image:
+                    break
 
             np.save(
                 os.path.join(destdir, f"scores_{prefix}{model_name}.npy"),
