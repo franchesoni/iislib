@@ -12,11 +12,22 @@ def get_dataloaders(num_workers=12, batch_size=256):
     from data.iis_dataset import RegionDataset
     from data.region_selector import random_single
     from data.transforms import (
-        RandomCrop,
+        # RandomCrop,
+        UniformRandomResize,
         composed_func,
         fix_mask_shape,
         to_channel_first,
         to_channel_last,
+    )
+    from albumentations import (
+        Flip,
+        RandomRotate90,
+        ShiftScaleRotate,
+        PadIfNeeded,
+        RandomCrop,
+        RandomBrightnessContrast,
+        RGBShift,
+        Compose,
     )
 
     # train data
@@ -24,14 +35,49 @@ def get_dataloaders(num_workers=12, batch_size=256):
         "/home/franchesoni/adisk/iis_datasets/datasets/SBD", split="train"
     )
     region_selector = random_single
+
+    crop_size = (224, 224)
+
     augmentator = composed_func(
         [
             fix_mask_shape,
             to_channel_last,
-            RandomCrop(out_size=(224, 224)),
+            Compose(
+                [
+                    UniformRandomResize(scale_range=(0.75, 1.25)),
+                    Flip(),
+                    RandomRotate90(),
+                    ShiftScaleRotate(
+                        shift_limit=0.03,
+                        scale_limit=0,
+                        rotate_limit=(-3, 3),
+                        border_mode=0,
+                        p=0.75,
+                    ),
+                    PadIfNeeded(
+                        min_height=crop_size[0],
+                        min_width=crop_size[1],
+                        border_mode=0,
+                    ),
+                    RandomCrop(*crop_size),
+                    RandomBrightnessContrast(
+                        brightness_limit=(-0.25, 0.25),
+                        contrast_limit=(-0.15, 0.4),
+                        p=0.75,
+                    ),
+                    RGBShift(
+                        r_shift_limit=10,
+                        g_shift_limit=10,
+                        b_shift_limit=10,
+                        p=0.75,
+                    ),
+                ],
+                p=1.0,
+            ),
             to_channel_first,
         ]
     )
+
     iis_dataset = RegionDataset(seg_dataset, region_selector, augmentator)
     train_iis_dataloader = torch.utils.data.DataLoader(
         iis_dataset,
@@ -45,7 +91,25 @@ def get_dataloaders(num_workers=12, batch_size=256):
         "/home/franchesoni/adisk/iis_datasets/datasets/SBD", split="test"
     )
     val_region_selector = random_single
-    val_augmentator = augmentator
+    val_augmentator = composed_func(
+        [
+            fix_mask_shape,
+            to_channel_last,
+            Compose(
+                [
+                    UniformRandomResize(scale_range=(0.75, 1.25)),
+                    PadIfNeeded(
+                        min_height=crop_size[0],
+                        min_width=crop_size[1],
+                        border_mode=0,
+                    ),
+                    RandomCrop(*crop_size),
+                ],
+                p=1.0,
+            ),
+            to_channel_first,
+        ]
+    )
     val_iis_dataset = RegionDataset(
         val_seg_dataset, val_region_selector, val_augmentator
     )
@@ -60,24 +124,29 @@ def get_dataloaders(num_workers=12, batch_size=256):
 
 def get_model(num_workers=4, batch_size=8, hacky=False):
     import segmentation_models_pytorch as smp
-    from engine.metrics import mse
+    from engine.metrics import NormalizedFocalLossSigmoid, mse
     from models.lightning import LitIIS
     from models.wrappers.iis_smp_wrapper import EarlySMP, EncodeSMP
     from clicking.encode import encode_disks_from_scratch
-    from clicking.robots import build_robot_mix, robot_01, robot_02, robot_03
+    from clicking.robots import (
+        build_robot_mix,
+        robot_01,
+        robot_02,
+        robot_03,
+        init_robot_smartly_random,
+    )
+
     from engine.metrics import eval_metrics
 
     lit_model = LitIIS(
-        mse,
-        build_robot_mix([robot_01, robot_02, robot_03], [3, 6, 1]),
-        # EarlySMP,
+        NormalizedFocalLossSigmoid(alpha=0.5, gamma=2),
+        robot_03,
+        init_robot_smartly_random,
         EncodeSMP,
         iis_model_kwargs_dict={
-            "smp_model_class": smp.Unet,
+            "smp_model_class": smp.DeepLabV3Plus,
             "smp_model_kwargs_dict": {
-                # "encoder_name": "dpn68b",
-                # "encoder_weights": "imagenet+5k",
-                "encoder_name": "mobilenet_v2",
+                "encoder_name": "timm-efficientnet-b7",
                 "encoder_weights": "imagenet",
             },
             "click_encoder": encode_disks_from_scratch,
@@ -88,7 +157,9 @@ def get_model(num_workers=4, batch_size=8, hacky=False):
             ignore_index=0,
             metrics=["mIoU", "mDice", "mFscore"],
         ),
-        max_interactions=4,
+        max_interactions=3,
+        max_init_clicks=10,
+        lr=1e-4,
     )
     if hacky:
         # hacky way to be able to tune the lr and batch size
@@ -108,7 +179,8 @@ if __name__ == "__main__":
     seed = 0
     tune = False
     # num_workers, batch_size = 6, 128
-    num_workers, batch_size = 4, 16
+    num_workers, batch_size = 6, 8
+    # num_workers, batch_size = 0, 16
 
     pl.seed_everything(seed)
     if tune:
@@ -137,14 +209,14 @@ if __name__ == "__main__":
 
     trainer = pl.Trainer(
         # training options
-        default_root_dir="../results",
+        default_root_dir="../results/",
         gpus=1,
         precision=16,
-        # max_epochs=1000,  # if commented, run forever
+        max_epochs=500,  # if commented, run forever
         # my options
         log_every_n_steps=1,
-        deterministic=True,
-        benchmark=False,
+        deterministic=False,
+        benchmark=True,
         # # optimization options
         # auto_scale_batch_size="binsearch",
         # auto_lr_find=True,

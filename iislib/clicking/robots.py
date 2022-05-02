@@ -19,13 +19,17 @@ All the robots 0x do
 - Add these points to the previous list
 - Encodes the clicks if an encoder is passed needed
 """
+from functools import lru_cache
 from typing import Callable
 from typing import Union
 
+import numpy as np
 import torch
 from clicking.utils import get_d_prob_map
 from clicking.utils import get_largest_region
+from clicking.utils import get_outside_border_mask
 from clicking.utils import output_target_are_B1HW_in_01
+from clicking.utils import safe_erode
 from clicking.utils import sample_points_torch
 from models.custom.gto99.interaction import click_position
 from models.custom.gto99.interaction import get_largest_incorrect_region
@@ -80,7 +84,8 @@ def robot_01(
     is_positive = [
         targets[:, :, i, j] == 1 for i, j in clicks
     ]  # a bool vector per click
-    _pcs, _ncs = [], []  # (batch element, click)
+    _pcs: list[list[Point]] = []
+    _ncs: list[list[Point]] = []  # (batch element, click)
     for ind_target in range(
         len(targets)
     ):  # add the clicks for each image in the batch
@@ -124,7 +129,8 @@ def robot_02(
         [targets[b, :, i, j] == 1 for i, j in clicks[b]]
         for b in range(len(clicks))
     ]  # a bool per click
-    _pcs, _ncs = [], []  # (batch element, click)
+    _pcs: list[list[Point]] = []
+    _ncs: list[list[Point]] = []  # (batch element, click)
     for b in range(len(targets)):  # add the clicks for each image in the batch
         _pcs.append([])
         _ncs.append([])
@@ -151,7 +157,8 @@ def robot_03(
     """
     Adds n_points into the lists `pcs` and `ncs`
     Randomly samples from largest false region.
-    implementation: detect largest false region and sample randomly from inside each one direclty
+    implementation: detect largest false region and sample randomly from
+    inside each one direclty
     """
     assert output_target_are_B1HW_in_01(outputs, targets)
     pred_masks = 1 * (thresh < outputs)
@@ -173,7 +180,8 @@ def robot_03(
         [targets[b, :, i, j] == 1 for i, j in clicks[b]]
         for b in range(len(clicks))
     ]  # a bool per click
-    _pcs, _ncs = [], []  # (batch element, click)
+    _pcs: list[list[Point]] = []
+    _ncs: list[list[Point]] = []  # (batch element, click)
     for b in range(len(targets)):  # add the clicks for each image in the batch
         _pcs.append([])
         _ncs.append([])
@@ -219,7 +227,8 @@ def robot_04(
         [targets[b, :, i, j] == 1 for i, j in clicks[b]]
         for b in range(len(clicks))
     ]  # a bool per click
-    _pcs, _ncs = [], []  # (batch element, click)
+    _pcs: list[list[Point]] = []
+    _ncs: list[list[Point]] = []  # (batch element, click)
     for b in range(len(targets)):  # add the clicks for each image in the batch
         _pcs.append([])
         _ncs.append([])
@@ -246,7 +255,8 @@ def robot_05(
     """
     Adds n_points into the lists `pcs` and `ncs`
     Randomly samples from largest false region.
-    implementation: detect largest false region and sample randomly from inside each one direclty
+    implementation: detect largest false region and sample randomly from
+    inside each one direclty
     """
     assert output_target_are_B1HW_in_01(outputs, targets)
     pred_masks = 1 * (thresh < outputs)
@@ -273,7 +283,8 @@ def robot_05(
         [targets[b, :, i, j] == 1 for i, j in clicks[b]]
         for b in range(len(clicks))
     ]  # a bool per click
-    _pcs, _ncs = [], []  # (batch element, click)
+    _pcs: list[list[Point]] = []
+    _ncs: list[list[Point]] = []  # (batch element, click)
     for b in range(len(targets)):  # add the clicks for each image in the batch
         _pcs.append([])
         _ncs.append([])
@@ -300,7 +311,8 @@ def robot_gto99(
     """
     Adds n_points into the lists `pcs` and `ncs`
     Randomly samples from largest false region.
-    implementation: detect largest false region and sample randomly from inside each one direclty
+    implementation: detect largest false region and sample randomly from
+    inside each one direclty
     """
     assert output_target_are_B1HW_in_01(outputs, targets)
     assert n_points == 1, "For getting to 99 paper we use only one click"
@@ -321,7 +333,8 @@ def robot_gto99(
         [targets[b, :, i, j] == 1 for i, j in clicks[b]]
         for b in range(len(clicks))
     ]  # a bool per click
-    _pcs, _ncs = [], []  # (batch element, click)
+    _pcs: list[list[Point]] = []
+    _ncs: list[list[Point]] = []  # (batch element, click)
     for b in range(len(targets)):  # add the clicks for each image in the batch
         _pcs.append([])
         _ncs.append([])
@@ -348,7 +361,8 @@ def robot_ritm(
     """
     Adds n_points into the lists `pcs` and `ncs`
     Randomly samples from largest false region.
-    implementation: detect largest false region and sample randomly from inside each one direclty
+    implementation: detect largest false region and sample randomly from
+    inside each one direclty
     """
     assert output_target_are_B1HW_in_01(outputs, targets)
     assert n_points == 1, "For ritm paper clicker we use only one click"
@@ -359,13 +373,9 @@ def robot_ritm(
             targets[ind][0].cpu().numpy().astype("int32")
         )  # no channel, int32 binary mask
         init_clicks = []
-        for interaction_ind in range(len(pcs)):  # along interactions
-            if 0 < len(pcs[interaction_ind][ind]) and isinstance(
-                pcs[interaction_ind][ind][0], torch.Tensor
-            ):
-                click = Click(
-                    is_positive=True, coords=pcs[interaction_ind][ind][0]
-                )
+        for interaction_ind, _pcs in enumerate(pcs):  # along interactions
+            if 0 < len(_pcs[ind]) and isinstance(_pcs[ind][0], torch.Tensor):
+                click = Click(is_positive=True, coords=_pcs[ind][0])
             else:
                 click = Click(
                     is_positive=False, coords=ncs[interaction_ind][ind][0]
@@ -380,7 +390,8 @@ def robot_ritm(
         [targets[b, :, i, j] == 1 for i, j in clicks[b]]
         for b in range(len(clicks))
     ]  # a bool per click
-    _pcs, _ncs = [], []  # (batch element, click)
+    _pcs: list[list[Point]] = []
+    _ncs: list[list[Point]] = []  # (batch element, click)
     for b in range(len(targets)):  # add the clicks for each image in the batch
         _pcs.append([])
         _ncs.append([])
@@ -397,6 +408,209 @@ def robot_ritm(
 
 
 ###########################################################################
+# init robots
+
+
+def init_robot_no_click(batch_of_targets):
+    pcs, ncs = [], []
+    return pcs, ncs
+
+
+def init_robot_random(
+    targets: torch.Tensor,  # (B, C, H, W), C=1, contained in {0, 1} (set)
+    n_points: int = 1,
+) -> tuple[Clicks, Clicks]:
+    """
+    Creates the lists `pcs` and `ncs` with n_points into them
+    Randomly samples and add labels according to target only.
+    """
+    assert output_target_are_B1HW_in_01(None, targets)
+    i_coord = torch.randint(
+        targets.shape[-2], (n_points,)
+    )  # the same clicks for all elements in batch
+    j_coord = torch.randint(targets.shape[-1], (n_points,))
+    clicks = list(
+        torch.stack((i_coord, j_coord), axis=1)
+    )  # (batch_element, coord) or list of points
+    is_positive = [
+        targets[:, :, i, j] == 1 for i, j in clicks
+    ]  # a bool vector per click
+    _pcs: list[list[Point]] = []
+    _ncs: list[list[Point]] = []  # (batch element, click)
+    for ind_target in range(
+        len(targets)
+    ):  # add the clicks for each image in the batch
+        _pcs.append([])
+        _ncs.append([])
+        for ind_click, click in enumerate(clicks):
+            if is_positive[ind_click][ind_target]:
+                _pcs[-1].append(click)
+            else:
+                _ncs[-1].append(click)
+    return [_pcs], [
+        _ncs
+    ]  # (interaction, batch, click) or list of list of list of Points
+
+
+@lru_cache(maxsize=None)
+def generate_probs(max_num_points, gamma):
+    probs = []
+    last_value = 1
+    for _ in range(max_num_points):
+        probs.append(last_value)
+        last_value *= gamma
+
+    probs = np.array(probs)
+    probs /= probs.sum()
+
+    return probs
+
+
+def init_robot_smartly_random(
+    targets: torch.Tensor,  # (B, C, H, W), C=1, contained in {0, 1} (set)
+    n_points: int = 1,
+) -> tuple[Clicks, Clicks]:
+    assert output_target_are_B1HW_in_01(None, targets)
+    # sample n_points from an imaginary grid of size n_points x n_points
+    # sample n_points noises on i and j
+    # sum those
+    size_i, size_j = (
+        targets.shape[-2] // n_points,
+        targets.shape[-1] // n_points,
+    )
+    flattened_grid_coords = torch.randperm(n_points * n_points)[:n_points]
+    noise_i = torch.randint(size_i, (n_points,))
+    noise_j = torch.randint(size_j, (n_points,))
+    i_coord = flattened_grid_coords // n_points * size_i + noise_i
+    j_coord = flattened_grid_coords % n_points * size_j + noise_j
+
+    clicks = list(
+        torch.stack((i_coord, j_coord), axis=1)
+    )  # (batch_element, coord) or list of points
+    is_positive = [
+        targets[:, :, i, j] == 1 for i, j in clicks
+    ]  # a bool vector per click
+    _pcs: list[list[Point]] = []
+    _ncs: list[list[Point]] = []  # (batch element, click)
+    for ind_target in range(
+        len(targets)
+    ):  # add the clicks for each image in the batch
+        _pcs.append([])
+        _ncs.append([])
+        for ind_click, click in enumerate(clicks):
+            if is_positive[ind_click][ind_target]:
+                _pcs[-1].append(click)
+            else:
+                _ncs[-1].append(click)
+    return [_pcs], [
+        _ncs
+    ]  # (interaction, batch, click) or list of list of list of Points
+
+
+def init_robot_ritm(
+    targets: torch.Tensor,  # (B, C, H, W), C=1, contained in {0, 1} (set)
+    n_points: int = 1,
+) -> tuple[Clicks, Clicks]:
+    """
+    Creates the lists `pcs` and `ncs` with n_points into them
+    Randomly samples and curates the selected clicks.
+    Add labels according to target only.
+    """
+    # in short, sample some random number of points from the eroded positive,
+    # and if first click, it is distance-based.
+    # then sample some random number of points from the different negatives
+    _pcs, _ncs = [], []
+
+    max_num_points = 12
+    prob_gamma = 0.8
+
+    _pos_probs = generate_probs(max_num_points, gamma=prob_gamma)
+    for mask in targets:
+        # number of positive points
+        num_points = 1 + np.random.choice(
+            np.arange(max_num_points), p=_pos_probs
+        )
+        indices = np.argwhere(mask)
+        pos_clicks = list(
+            indices[np.random.choice(len(indices), num_points, replace=False)]
+        )
+        # add to list
+        _pcs.append(pos_clicks)  # (B, click)
+
+    negative_bg_prob = 0.1
+    negative_other_prob = 0.4
+    negative_border_prob = 0.5
+    neg_strategies = ["bg", "other", "border"]
+    neg_strategies_prob = [
+        negative_bg_prob,
+        negative_other_prob,
+        negative_border_prob,
+    ]
+    _neg_probs = generate_probs(max_num_points + 1, gamma=prob_gamma)
+
+    for mask in targets:
+        bg = 1 - mask
+        other = bg
+        border = get_outside_border_mask(mask)
+        required = safe_erode(bg, 4)
+        _neg_masks = {
+            "bg": bg,
+            "other": other,
+            "border": border,
+            "required": required,
+        }
+
+        num_points_required = np.random.choice(
+            np.arange(max_num_points + 1), p=_pos_probs
+        )
+        num_points_strategies = min(
+            max_num_points - num_points_required,
+            np.random.choice(np.arange(max_num_points + 1), p=_neg_probs),
+        )
+
+        indices = np.argwhere(required)
+        neg_clicks = list(
+            indices[
+                np.random.choice(
+                    len(indices), num_points_required, replace=False
+                )
+            ]
+        )
+
+        for j in range(num_points_strategies):
+            strat = np.random.choice(neg_strategies, p=neg_strategies_prob)
+            tmask = _neg_masks[strat]
+            indices = np.argwhere(tmask)
+            neg_clicks.append(indices[np.random.choice(len(indices), 1)])
+
+        _ncs.append(neg_clicks)
+
+    return [_pcs], [_ncs]
+
+
+#######################################################################
+# explanation of multipointsampler
+# sample mask joining masks and eroding them
+# get the _neg_probs dict with neg_mask_bg, other, border,
+# and neg_masks (eroded)
+# sample positive points from selected masks, non negative, with first
+# click center
+# filter out selected masks if exceeding max_num_points
+# sample points for each selected mask
+# randomly choose how many points to sample
+# if there are probabilities for each mask, put them along the indices
+# for j in num_points
+# distance-based sampling if first click
+# sample a mask according to probs if many masks
+# sample from mask if only one mask
+# if points sampled from only one mask, take those, fill and return
+# else
+# if only one first click, take the first points
+# sample (unitl max_num_points) from union of masks with given probability
+# sample negative points from different masks
+
+
+######################################################################
 
 
 # def get_next_points_1(

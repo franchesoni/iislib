@@ -1,6 +1,7 @@
 import functools
 import glob
 import os
+import pickle
 import sys
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from data.transforms import norm_fn
 from engine.metrics import eval_metrics
 from torchvision.transforms.functional import center_crop
 from torchvision.transforms.functional import resize
+
 
 sys.path.append("/home/franchesoni/iis/iislib/tests/")
 from visualization import visualize_on_test
@@ -147,31 +149,34 @@ def get_dataset():
 
 
 def test():
+    exp_prefix = "first_pseudo_battle_"
+    destdir = "/home/franchesoni/iis/iislib/results/tmp"
     only_one_image = False
-    exp_prefix = "all_robots_"
-    model_names = ["gto99", "ritm"]
+    model_names = ["ours", "gto99", "ritm"]
     robots = [
-        robot_01,
-        robot_02,
+        # robot_01,
         robot_03,
-        robot_04,
-        robot_05,
-        robot_gto99,
-        robot_ritm,
+        # robot_gto99,
     ]
     robot_prefix = [
-        "r01_",
-        "r02_",
+        # "r01_",
         "r03_",
-        "r04_",
-        "r05_",
-        "rgto99_",
-        "rritm_",
+        # "rgto99_",
     ]
+    config = {
+        "exp_prefix": exp_prefix,
+        "destdir": destdir,
+        "only_one_image": only_one_image,
+        "model_names": model_names,
+        "robot_prefixes": robot_prefix,
+    }
+
+    # save config to pickle file
+    with open(os.path.join(destdir, exp_prefix + "config.pkl"), "wb") as f:
+        pickle.dump(config, f)
 
     seed = 0
-    max_n_clicks = 20
-    destdir = "/home/franchesoni/iis/iislib/results/tmp"
+    max_n_clicks = 10
     compute_scores = functools.partial(
         eval_metrics,
         num_classes=1,

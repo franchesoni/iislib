@@ -5,11 +5,13 @@ def interact(
     model,
     init_z,
     init_y,
-    robot_click,
+    robot_clicker,
+    init_robot_clicker,
     batch,
     interaction_steps=None,
     max_interactions=None,
     clicks_per_step=1,
+    max_init_clicks=5,
     batch_idx=None,
 ):
     assert bool(interaction_steps) != bool(
@@ -25,6 +27,9 @@ def interact(
         # are computed (outside the for loop)
     else:
         interaction_steps_m1 = interaction_steps - 1
+    init_clicks = int(
+        torch.randint(max_init_clicks, (1,))
+    )  # cast to int because this is used by torch.randperm
 
     image, target = (
         batch["image"],
@@ -42,16 +47,19 @@ def interact(
     ), f"Target should be (B, 1, H, W) but is {target.shape}"
     z = init_z(image, target)
     y = init_y(image, target)
-    pcs, ncs = [], []
+    if init_robot_clicker is not None and 0 < init_clicks:
+        pcs, ncs = init_robot_clicker(target, init_clicks)
+    else:
+        pcs, ncs = [], []
 
     with torch.no_grad():
         for iter_indx in range(interaction_steps_m1):  # isteps-1 times
-            pcs, ncs = robot_click(
+            pcs, ncs = robot_clicker(
                 y, target, n_points=clicks_per_step, pcs=pcs, ncs=ncs
             )
             y, z = model(image, z, pcs, ncs)
     # last interaction with gradient computation
-    pcs, ncs = robot_click(
+    pcs, ncs = robot_clicker(
         y, target, n_points=clicks_per_step, pcs=pcs, ncs=ncs
     )
     y, z = model(image, z, pcs, ncs)

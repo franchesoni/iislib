@@ -2,6 +2,11 @@ import torch
 from data.transforms import norm_fn
 from models.custom.ritm.isegm.inference import utils
 
+# define model here
+# checkpoint = "/home/franchesoni/iis/iislib/iislib/models/custom/ritm/sbd_h18_itermask.pth"  # pretrained
+checkpoint = "/home/franchesoni/iis/ritm_interactive_segmentation/experiments/iter_mask/sbd_hrnet18s/003_apr-25-first/checkpoints/last_checkpoint.pth"  # reproduced
+model = utils.load_is_model(checkpoint, device="cpu")
+
 
 def recursive_len(item):
     if type(item) == list:
@@ -84,11 +89,6 @@ def initialize_z(image, target):
 def initialize_y(image, target):
     y = torch.zeros_like(target)
     return y
-
-
-# define model here
-checkpoint = "/home/franchesoni/iis/iislib/iislib/models/custom/ritm/sbd_h18_itermask.pth"
-model = utils.load_is_model(checkpoint, device="cpu")
 
 
 def ritm(x, z, pcs, ncs, model=model):

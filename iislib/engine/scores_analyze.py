@@ -1,4 +1,5 @@
 import os
+import pickle
 
 import matplotlib.pyplot as plt
 import matplotlib.style as sty
@@ -93,10 +94,14 @@ def plot_grid_res(
 
 if __name__ == "__main__":
     res_dir = "/home/franchesoni/iis/iislib/results/tmp/"
-    prefix = "all_robots_"
-    model_names = ["gto99", "ritm"]
-    # robot_prefixes = ["r01_", "r02_", "r03_", "r04_", "r05_", "rgto99_", "rritm_"]
-    robot_prefixes = ["rgto99_", "rritm_"]
+    prefix = exp_prefix = "first_pseudo_battle_"
+    # load config file and get variables
+    with open(os.path.join(res_dir, exp_prefix + "config.pkl"), "rb") as f:
+        config = pickle.load(f)
+    # get variables from config dict
+    model_names = config["model_names"]
+    robot_prefixes = config["robot_prefixes"]
+
     model_res = {}
     for model_name in model_names:
         for robot_prefix in robot_prefixes:
@@ -113,6 +118,6 @@ if __name__ == "__main__":
         model_names,
         robot_prefixes,
         dest_dir=res_dir,
-        prefix=prefix + "best_",
+        prefix=prefix,
     )
     # model_res, [r + n for r in robot_prefixes for n in model_names], dest_dir=res_dir, prefix=prefix

@@ -1,9 +1,14 @@
+import sys
 from typing import Callable
 from typing import Union
 
 import pytorch_lightning as pl
 import torch
+import torchvision
 from engine.training_logic import interact
+
+sys.path.append("../tests")
+from visualization import visualize
 
 
 class LitIIS(pl.LightningModule):
@@ -11,6 +16,7 @@ class LitIIS(pl.LightningModule):
         self,
         loss_fn,
         robot_click,
+        init_robot_click,
         iis_model_cls,
         iis_model_args_list=None,
         iis_model_kwargs_dict=None,
@@ -18,6 +24,7 @@ class LitIIS(pl.LightningModule):
         validation_metrics=None,
         interaction_steps=None,
         max_interactions=4,
+        max_init_clicks=5,
         lr=0.01,
     ):
         super().__init__()
@@ -30,10 +37,12 @@ class LitIIS(pl.LightningModule):
         )
         self.loss_fn = loss_fn
         self.robot_click = robot_click
+        self.init_robot_click = init_robot_click
         self.training_metrics = training_metrics or {}
         self.validation_metrics = validation_metrics or training_metrics
         self.interaction_steps = interaction_steps
         self.max_interactions = max_interactions
+        self.max_init_clicks = max_init_clicks
         self.lr = lr
 
     def forward(self, x, z, pcs, ncs):
@@ -91,14 +100,16 @@ class LitIIS(pl.LightningModule):
             self.model.init_z,
             self.model.init_y,
             self.robot_click,
+            self.init_robot_click,
             batch,
             interaction_steps=self.interaction_steps,
             max_interactions=self.max_interactions,
-            clicks_per_step=2,
+            clicks_per_step=1,
+            max_init_clicks=self.max_init_clicks,
             batch_idx=batch_idx,
         )
         target = batch["mask"]
-        loss = self.loss_fn(y, target)
+        loss = torch.mean(self.loss_fn(y, target))
         self.log("train_loss", loss)  # lightning
         self.log_metrics(
             y.detach(), target.detach(), self.training_metrics, prefix="train"
@@ -111,10 +122,12 @@ class LitIIS(pl.LightningModule):
             self.model.init_z,
             self.model.init_y,
             self.robot_click,
+            self.init_robot_click,
             batch,
             interaction_steps=self.interaction_steps or self.max_interactions,
             max_interactions=None,  # no randomness involved when validating
-            clicks_per_step=2,
+            clicks_per_step=1,
+            max_init_clicks=self.max_init_clicks,
             batch_idx=batch_idx,
         )
         target = batch["mask"]
@@ -123,7 +136,18 @@ class LitIIS(pl.LightningModule):
         self.log_metrics(
             y, target, self.training_metrics, prefix="val"
         )  # custom
+        # save images
+        grid1 = torchvision.utils.make_grid([batch["image"][0]])
+        grid2 = torchvision.utils.make_grid([batch["mask"][0], y[0]])
+        self.logger.experiment.add_image(
+            "validation input", grid1, self.global_step
+        )
+        self.logger.experiment.add_image(
+            "validation result", grid2, self.global_step
+        )
         return loss
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
+        return torch.optim.Adam(
+            self.parameters(), lr=self.lr, weight_decay=1e-4
+        )

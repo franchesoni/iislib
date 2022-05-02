@@ -1,8 +1,12 @@
 from typing import Union
 
 import albumentations as A
+import cv2
 import numpy as np
 import torch
+from albumentations import DualTransform
+from albumentations.augmentations import functional as F
+from albumentations.augmentations.geometric import resize
 
 
 def composed_func(list_of_funcs):
@@ -10,7 +14,13 @@ def composed_func(list_of_funcs):
         image: np.ndarray, mask: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray]:
         for func in list_of_funcs:
-            image, mask = func(image, mask)
+            ret = func(image=image, mask=mask)
+            if isinstance(ret, tuple):
+                image, mask = ret
+            elif isinstance(ret, dict):
+                image, mask = ret["image"], ret["mask"]
+            else:
+                raise TypeError("Return type is not a tuple or dict")
         return image, mask
 
     return transform
@@ -27,7 +37,8 @@ def fix_mask_shape(
         mask (Union[torch.Tensor, np.ndarray]): mask, (H, W), or
 
     Raises:
-        ValueError: if output mask shape is not similar to image shape (flexibility on the channel dim)
+        ValueError: if output mask shape is not similar to image shape
+        (flexibility on the channel dim)
 
     Returns:
         tuple[Union[torch.Tensor, np.ndarray]: input image
@@ -42,7 +53,8 @@ def fix_mask_shape(
             raise ValueError(f"Image has shape {image.shape} which is strange")
     if not (np.argmin(mask.shape) == np.argmin(image.shape)):
         raise ValueError(
-            f"output `mask` and `image` should have same channel order but have {mask.shape} and {image.shape} shapes respectively"
+            f"output `mask` and `image` should have same channel order but \
+                have {mask.shape} and {image.shape} shapes respectively"
         )
     return image, mask
 
@@ -90,7 +102,8 @@ def to_channel_last_single(
     """Converts to (H, W, C)"""
     assert (
         image.ndim == 3
-    ), f"An image should have 3 dimensions! (C, H, W) or (H, W, C). Yours has shape {image.shape}"
+    ), f"An image should have 3 dimensions! (C, H, W) or (H, W, C). \
+        Yours has shape {image.shape}"
     # if we need to do something
     if min(image.shape) == image.shape[0]:
         if isinstance(image, torch.Tensor):
@@ -138,6 +151,54 @@ class RandomCrop:
             image=image, mask=mask
         )  # albumentations returns a transformed object
         return tsample["image"], tsample["mask"]
+
+
+class UniformRandomResize(DualTransform):
+    def __init__(
+        self,
+        scale_range=(0.9, 1.1),
+        interpolation=cv2.INTER_LINEAR,
+        always_apply=False,
+        p=1,
+    ):
+        super().__init__(always_apply, p)
+        self.scale_range = scale_range
+        self.interpolation = interpolation
+
+    def get_params_dependent_on_targets(self, params):
+        scale = (
+            torch.rand((1,)).item()
+            * (self.scale_range[1] - self.scale_range[0])
+            + self.scale_range[0]
+        )
+        height = int(round(params["image"].shape[0] * scale))
+        width = int(round(params["image"].shape[1] * scale))
+        return {"new_height": height, "new_width": width}
+
+    def apply(
+        self,
+        img,
+        new_height=0,
+        new_width=0,
+        interpolation=cv2.INTER_LINEAR,
+        **params,
+    ):
+        # return F.resize(img, height=new_height, width=new_width, interpolation=interpolation)
+        return resize.Resize(
+            height=new_height, width=new_width, interpolation=interpolation
+        )(image=img)["image"]
+
+    def apply_to_keypoint(self, keypoint, new_height=0, new_width=0, **params):
+        scale_x = new_width / params["cols"]
+        scale_y = new_height / params["rows"]
+        return F.keypoint_scale(keypoint, scale_x, scale_y)
+
+    def get_transform_init_args_names(self):
+        return "scale_range", "interpolation"
+
+    @property
+    def targets_as_params(self):
+        return ["image"]
 
 
 class Dummy:

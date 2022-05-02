@@ -7,9 +7,7 @@ import numpy as np
 import torch
 
 
-def visualize_on_test(
-    image, target, output, pcs, ncs, name, alpha=0.3, destdir=None
-):
+def visualize(image, target, output, pcs, ncs, name, alpha=0.3):
     assert image.shape[2] == 3 and len(image.shape) == 3
     assert len(target.shape) == 2 == len(output.shape)
 
@@ -86,12 +84,20 @@ def visualize_on_test(
     plt.axis("off")
 
     plt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
+    fig = plt.gcf()
+    return fig
+
+
+def visualize_on_test(
+    image, target, output, pcs, ncs, name, alpha=0.3, destdir=None
+):
+    fig = visualize(image, target, output, pcs, ncs, name, alpha)
 
     if destdir is None:
-        plt.savefig(name + ".png")
+        fig.savefig(name + ".png")
     else:
         Path(destdir).mkdir(exist_ok=True)
-        plt.savefig(os.path.join(destdir, name + ".png"))
+        fig.savefig(os.path.join(destdir, name + ".png"))
     plt.close()
 
 
@@ -117,7 +123,7 @@ def visualize_clicks(image, mask, alpha, pc_list, nc_list, name):
     plt.close()
 
 
-def visualize(img, name):
+def save_as_png(img, name):
     """Save image as png"""
     plt.figure()
     plt.imshow(img)

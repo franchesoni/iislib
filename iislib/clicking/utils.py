@@ -46,24 +46,31 @@ def get_largest_incorrect_region(alpha, gt):
 
 
 def get_largest_region(mask: np.ndarray) -> np.ndarray:
+    if mask.sum() == 0:
+        return np.ones_like(mask)  # largest false region is anywhere
     labels = skimage.morphology.label(mask, connectivity=1)
     label_unique, counts = np.unique(labels[labels != 0], return_counts=True)
     return 1 * (labels == label_unique[np.argmax(counts)])
 
 
-def output_target_are_B1HW_in_01(outputs: Any, targets: Any) -> bool:
+def output_target_are_B1HW_in_01(
+    outputs: Any = None, targets: Any = None
+) -> bool:
     """Return True if inputs are torch Tensors of (B, C, H, W) shape and C=1,
     and if target is binary and output is in [0,1]"""
-    return (
-        (len(outputs.shape) == len(targets.shape) == 4)
-        and (outputs.shape[1] == targets.shape[1] == 1)
-        and (
-            isinstance(outputs, torch.Tensor)
-            and isinstance(targets, torch.Tensor)
-        )
+    targets_ok = targets is None or (
+        (len(targets.shape) == 4)
+        and (targets.shape[1] == 1)
+        and (isinstance(targets, torch.Tensor))
         and ({int(e) for e in targets.unique()}.issubset({0, 1}))
+    )
+    outputs_ok = outputs is None or (
+        (len(outputs.shape) == 4)
+        and (outputs.shape[1] == 1)
+        and (isinstance(outputs, torch.Tensor))
         and (0 <= outputs.min() and outputs.max() <= 1)
     )
+    return targets_ok and outputs_ok
 
 
 def get_d_prob_map(mask: np.ndarray, hard_thresh: float = 1e-6) -> np.ndarray:
