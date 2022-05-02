@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import cv2
 import numpy as np
 import torch
@@ -18,7 +20,10 @@ def scale_input(x: np.ndarray, scale_type) -> np.ndarray:
 
 
 def np_to_torch(x):
-    return torch.from_numpy(x).permute(2, 0, 1)[None, :, :, :].float().cuda()
+    xo = torch.from_numpy(x).permute(2, 0, 1)[None, :, :, :].float()
+    if torch.cuda.is_available():
+        xo = xo.cuda()
+    return xo
 
 
 def pred(
@@ -76,11 +81,12 @@ def pred(
 class args:
     use_mask_input = True
     use_usr_encoder = True
-    weights = "/home/franchesoni/iis/iislib/iislib/models/custom/gto99/InterSegSynthFT.pth"
+    weights = Path(__file__).parent / "InterSegSynthFT.pth"  # weights = "/home/franchesoni/iis/iislib/iislib/models/custom/gto99/InterSegSynthFT.pth"
     iou_lim = None
-    dataset_dir = "/home/franchesoni/adisk/iis_datasets/datasets/GrabCut/"
+    dataset_dir = ""  #/home/franchesoni/adisk/iis_datasets/datasets/GrabCut/"
     predictions_dir = ""
     num_clicks = 20
+    
 
 
 model = build_model(args)
