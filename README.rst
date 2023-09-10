@@ -22,7 +22,7 @@ In practice an annotation is a set of positive/negative clicks and there
 are auxiliary variables that are used and transformed by the model. An
 IIS model :math:`f` is then
 
-.. math:: \hat{y}_{k+1}, z_{k+1} = f(x, z_k, [c_1, \dots, c_k])
+$$ \\hat{y}_{k+1}, z_{k+1} = f(x, z_k, [c_1, \\dots, c_k])$$
 
 where :math:`x` is the input image, :math:`z` is an auxiliary variable
 (e.g. :math:`z_k = \hat{y}_k`), and :math:`c_k` are the clicks made at
